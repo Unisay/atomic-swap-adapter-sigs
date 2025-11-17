@@ -1,0 +1,6 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:atomic-swap-adapter-sigs"
+    - path: "test"
+      component: "test:atomic-swap-tests"

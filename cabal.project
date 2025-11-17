@@ -1,0 +1,11 @@
+packages: .
+
+-- Use recent package index
+index-state: 2025-01-14T00:00:00Z
+
+-- Test configuration
+test-show-details: streaming
+
+-- Disable optimizations for faster compilation (tutorial project)
+package atomic-swap-adapter-sigs
+  ghc-options: -O0

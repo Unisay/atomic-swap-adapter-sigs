@@ -1,0 +1,40 @@
+[formatter.fourmolu]
+command = "fourmolu"
+options = [
+  "--mode", "inplace",
+  "--indentation", "2",
+  "--column-limit", "80",
+  "--function-arrows", "leading",
+  "--comma-style", "leading",
+  "--import-export-style", "leading",
+  "--indent-wheres", "true",
+  "--record-brace-space", "true",
+  "--newlines-between-decls", "1",
+  "--haddock-style", "multi-line",
+  "--let-style", "auto",
+  "--in-style", "right-align",
+  "--single-constraint-parens", "never",
+  "--single-deriving-parens", "never",
+  "--unicode", "never",
+  "--respectful", "true",
+  # Syntax-affecting GHC extensions from default-extensions in cabal
+  "--ghc-opt", "-XBangPatterns",
+  "--ghc-opt", "-XBlockArguments",
+  "--ghc-opt", "-XLambdaCase",
+  "--ghc-opt", "-XImportQualifiedPost",
+]
+includes = ["*.hs"]
+
+[formatter.cabal-fmt]
+command = "cabal-fmt"
+options = ["--inplace"]
+includes = ["*.cabal"]
+
+[formatter.nixfmt]
+command = "nixfmt"
+includes = ["*.nix"]
+
+[formatter.prettier]
+command = "prettier"
+options = ["--write"]
+includes = ["*.md", "*.yaml", "*.yml"]
