@@ -31,16 +31,18 @@ import AtomicSwap.Blockchain.Ledger
 import AtomicSwap.Blockchain.Transaction (buildTransaction, hashTransaction)
 import AtomicSwap.Blockchain.Types (Blockchain)
 import AtomicSwap.Crypto.Adapter
-  ( preSignREdDSA
+  ( adaptSignature
+  , extractAdapterSecret
+  , preSignREdDSA
   , preVerifyREdDSA
   )
-import AtomicSwap.Crypto.Signatures (signREdDSA)
 import AtomicSwap.Logging
   ( logAction
   , logError
   , logInfo
   , logPhase
   , logPublicKey
+  , logSecret
   , logSeparator
   , logSubPhase
   , logTransaction
@@ -48,11 +50,13 @@ import AtomicSwap.Logging
 import AtomicSwap.Protocol.Messaging (MessageQueue, receiveMessage, sendMessage)
 import AtomicSwap.Types
   ( AdapterPoint (..)
+  , AdapterSecret (..)
   , Message (..)
   , NIZKProof (..)
   , Output (..)
   , Party (..)
   , PublicKey (..)
+  , Signature (..)
   , SwapResult (..)
   , Transaction (..)
   , TxId (..)
@@ -277,67 +281,81 @@ continueBobProtocol bob chainB toBob toAlice amountToSend alicePubKey adapterPoi
                               (partyName bob)
                               "NOTE: In real system, would extract from Alice's published tx"
 
-                          -- For now, we need Alice to send her complete signature for extraction
-                          -- This is a simplification - in reality Bob would observe ChainA
+                          -- Wait for Alice's complete signature so we can extract the adapter secret
                           liftIO $
                             logAction
                               (partyName bob)
-                              "Waiting for Alice's complete signature (for demonstration)"
+                              "Waiting for Alice's complete signature for extraction"
 
-                          -- Since we can't actually extract without Alice's complete signature,
-                          -- we'll need to wait for it or have Alice include it in the message
-                          -- For this simplified version, let's just create a dummy adapter secret
-                          -- and complete the signature
-
-                          -- In the full version, this would be:
-                          -- let extractedSecret = extractAdapterSecret alicePreSig aliceCompleteSig
-
-                          -- For now, create a minimal valid signature
-                          liftIO $
-                            logError
-                              (partyName bob)
-                              "SIMULATION LIMITATION: Cannot extract without querying ChainA"
-                          liftIO $
-                            logInfo
-                              (partyName bob)
-                              "In production: Bob would query ChainA, extract t, complete signature"
-
-                          -- For testing purposes, we'll sign normally
-                          -- This is NOT how the real protocol works!
-                          liftIO $
-                            logInfo (partyName bob) "Using fallback: signing without adapter secret"
-                          bobCompleteSig <- signREdDSA (partyPrivateKey bob) (partyPublicKey bob) txHash
-
-                          let signedBobTx = bobTx {txSignatures = [bobCompleteSig]}
-
-                          liftIO $ logAction (partyName bob) "Publishing transaction to ChainB"
-                          submitResult <- submitTransaction chainB signedBobTx
-
-                          case submitResult of
-                            Left err -> do
-                              liftIO $ logError (partyName bob) ("Transaction submission failed: " <> err)
-                              return $
-                                SwapFailure ("Bob's transaction submission failed: " <> err)
-                            Right txId -> do
-                              let TxId txIdBytes = txId
+                          msg <- receiveMessage toBob
+                          case msg of
+                            CompleteSignatureMsg aliceCompleteSig -> do
                               liftIO $
-                                logTransaction (partyName bob) "Transaction published successfully" txIdBytes
+                                logInfo (partyName bob) "Received Alice's complete signature"
 
-                              -- Final status
-                              liftIO logSeparator
-                              liftIO $ logPhase "BOB'S PROTOCOL COMPLETE"
-
-                              finalBalance <- getBalance chainB (partyPublicKey bob)
+                              -- Extract adapter secret from Alice's signatures
+                              -- y = sig_complete - sig_presig
                               liftIO $
-                                logInfo (partyName bob) ("Final balance on ChainB: " <> show finalBalance)
+                                logAction (partyName bob) "Extracting adapter secret from signatures"
+                              let extractedSecret = extractAdapterSecret alicePreSig aliceCompleteSig
 
-                              liftIO $ logInfo (partyName bob) "✓ Atomic swap completed successfully"
+                              let AdapterSecret extractedBytes = extractedSecret
                               liftIO $
-                                logInfo
+                                logSecret
                                   (partyName bob)
-                                  "✓ Successfully extracted adapter secret and completed transaction"
+                                  "Extracted adapter secret"
+                                  extractedBytes
 
-                              return SwapSuccess
+                              -- Complete Bob's signature using extracted adapter secret
+                              -- sig_bob = sig_tilde_bob + y
+                              liftIO $
+                                logAction (partyName bob) "Completing signature with extracted secret"
+                              let bobCompleteSig = adaptSignature bobPreSig extractedSecret
+
+                              -- Verify that the completed signature is valid
+                              let Signature {sigScalar = completeSigScalar} = bobCompleteSig
+                              liftIO $
+                                logSecret
+                                  (partyName bob)
+                                  "Completed signature scalar"
+                                  completeSigScalar
+
+                              let signedBobTx = bobTx {txSignatures = [bobCompleteSig]}
+
+                              liftIO $ logAction (partyName bob) "Publishing transaction to ChainB"
+                              submitResult <- submitTransaction chainB signedBobTx
+
+                              case submitResult of
+                                Left err -> do
+                                  liftIO $ logError (partyName bob) ("Transaction submission failed: " <> err)
+                                  return $
+                                    SwapFailure ("Bob's transaction submission failed: " <> err)
+                                Right txId -> do
+                                  let TxId txIdBytes = txId
+                                  liftIO $
+                                    logTransaction (partyName bob) "Transaction published successfully" txIdBytes
+
+                                  -- Final status
+                                  liftIO logSeparator
+                                  liftIO $ logPhase "BOB'S PROTOCOL COMPLETE"
+
+                                  finalBalance <- getBalance chainB (partyPublicKey bob)
+                                  liftIO $
+                                    logInfo (partyName bob) ("Final balance on ChainB: " <> show finalBalance)
+
+                                  liftIO $ logInfo (partyName bob) "✓ Atomic swap completed successfully"
+                                  liftIO $
+                                    logInfo
+                                      (partyName bob)
+                                      "✓ Successfully extracted adapter secret and completed transaction"
+
+                                  return SwapSuccess
+                            _ -> do
+                              liftIO $
+                                logError
+                                  (partyName bob)
+                                  "Unexpected message type (expected CompleteSignatureMsg)"
+                              return $ SwapFailure "Protocol error: Expected complete signature from Alice"
                         _ -> do
                           liftIO $ logError (partyName bob) "Expected SwapCompleteMsg from Alice"
                           return $ SwapFailure "Protocol error: Expected swap complete message"

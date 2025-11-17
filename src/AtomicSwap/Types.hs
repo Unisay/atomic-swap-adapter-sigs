@@ -156,6 +156,8 @@ data Message
   = PublicKeyMsg PublicKey
   | AdapterPointMsg AdapterPoint
   | TransactionProposalMsg Transaction AdaptedSignature
+  | -- | Alice's complete signature for extraction
+    CompleteSignatureMsg Signature
   | SwapCompleteMsg
   deriving stock (Show, Eq)
 
