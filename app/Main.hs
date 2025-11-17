@@ -29,7 +29,7 @@ import AtomicSwap.Simulator.Run (SimulatorT, runSimulatorT)
 import AtomicSwap.Simulator.State
   ( SimulatorState
   , detectChangedParties
-  , emptySimulatorState
+  , mkSimulatorState
   )
 import AtomicSwap.Simulator.Steps
   ( StepResult (..)
@@ -44,8 +44,10 @@ import AtomicSwap.Simulator.Steps
   , executeBobSendPublicKey
   , executeBobVerifyNIZKProof
   )
+import AtomicSwap.Simulator.Types (Asset (..), Quantity (..))
 import Data.IORef.Strict (StrictIORef)
 import Data.IORef.Strict qualified as Strict
+import System.Random (randomRIO)
 
 --------------------------------------------------------------------------------
 -- HTML Response Helper --------------------------------------------------------
@@ -127,7 +129,9 @@ mkApp stateRef req respond =
     ("POST", ["step", "bob-verify-nizk-proof"]) ->
       executeWithStateDiff stateRef executeBobVerifyNIZKProof respond
     ("POST", ["reset"]) -> do
-      Strict.writeIORef stateRef emptySimulatorState
+      -- Generate new random amounts for the swap (ensuring they're different)
+      (apples, bananas) <- generateDifferentAmounts
+      Strict.writeIORef stateRef (mkSimulatorState apples bananas)
       currentState <- Strict.readIORef stateRef
       respond $ htmlResponse (mainPage currentState)
     ("GET", ["static", fileName]) ->
@@ -140,9 +144,30 @@ mkApp stateRef req respond =
     _ ->
       respond $ responseLBS status404 [("Content-Type", "text/plain")] "Not Found"
 
+-- | Generate two different random amounts
+generateDifferentAmounts :: IO (Quantity 'Apple, Quantity 'Banana)
+generateDifferentAmounts = do
+  applesInt <- randomRIO (2, 100 :: Int)
+  bananasInt <- randomRIO (2, 100 :: Int)
+  if applesInt == bananasInt
+    then generateDifferentAmounts -- Retry if equal
+    else
+      pure
+        ( Quantity @'Apple (fromIntegral applesInt)
+        , Quantity @'Banana (fromIntegral bananasInt)
+        )
+
 main :: IO ()
 main = do
   putTextLn "Starting Atomic Swap Simulator..."
   putTextLn "Visit http://localhost:8888"
-  stateRef <- Strict.newIORef $! emptySimulatorState
+  -- Generate random swap amounts (2-100 range, ensuring they're different)
+  (apples, bananas) <- generateDifferentAmounts
+  putTextLn $
+    "Swap agreement: Alice offers "
+      <> show apples
+      <> " apples for Bob's "
+      <> show bananas
+      <> " bananas"
+  stateRef <- Strict.newIORef $! mkSimulatorState apples bananas
   run 8888 (mkApp stateRef)

@@ -22,6 +22,7 @@ module AtomicSwap.Simulator.State
   ( -- * State Management
     SimulatorState (..)
   , PartyState (..)
+  , mkSimulatorState
   , emptySimulatorState
   , emptyPartyState
   , appendStep
@@ -105,20 +106,31 @@ data SimulatorState = SimulatorState
   { ssGlobalState :: GlobalState
   , ssAliceState :: PartyState
   , ssBobState :: PartyState
+  , ssSwapAmounts
+      :: ( Quantity 'Apple
+         , Quantity 'Banana
+         )
+  -- ^ (apples from Alice, bananas from Bob)
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass NFData
 
 instance NoThunks SimulatorState
 
-emptySimulatorState :: SimulatorState
-emptySimulatorState =
+-- | Create initial simulator state with agreed swap amounts
+mkSimulatorState :: Quantity 'Apple -> Quantity 'Banana -> SimulatorState
+mkSimulatorState applesFromAlice bananasFromBob =
   force $
     SimulatorState
       { ssGlobalState = []
       , ssAliceState = emptyPartyState
       , ssBobState = emptyPartyState
+      , ssSwapAmounts = (applesFromAlice, bananasFromBob)
       }
+
+-- | Deprecated: Use mkSimulatorState instead
+emptySimulatorState :: SimulatorState
+emptySimulatorState = mkSimulatorState 0 0
 
 --------------------------------------------------------------------------------
 -- State Operations ------------------------------------------------------------
@@ -139,7 +151,7 @@ appendStep participant inputs updates state =
   let stepIndex = StepIndex $ length (ssGlobalState state)
       entry = (stepIndex, participant, inputs, updates)
       newGlobalState = ssGlobalState state <> [entry]
-   in reconstructState newGlobalState
+   in reconstructState (ssSwapAmounts state) newGlobalState
 
 -- | Get party state
 getPartyState :: Participant -> SimulatorState -> PartyState
@@ -220,12 +232,14 @@ bobStateFold = L.Fold step emptyPartyState id
       foldl' (flip $ applyUpdate Bob) partyState updates
 
 -- | Reconstruct complete simulator state from global state
-reconstructState :: GlobalState -> SimulatorState
-reconstructState globalState =
+reconstructState
+  :: (Quantity 'Apple, Quantity 'Banana) -> GlobalState -> SimulatorState
+reconstructState swapAmounts globalState =
   SimulatorState
     { ssGlobalState = globalState
     , ssAliceState = L.fold aliceStateFold globalState
     , ssBobState = L.fold bobStateFold globalState
+    , ssSwapAmounts = swapAmounts
     }
 
 --------------------------------------------------------------------------------

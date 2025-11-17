@@ -8,6 +8,7 @@ module AtomicSwap.Simulator.Types
   ( -- * Core Types
     Participant (..)
   , Asset (..)
+  , Quantity (..)
   , Chain (..)
   , SomeChain (..)
 
@@ -35,6 +36,17 @@ data Asset = Apple | Banana
   deriving stock Generic
 
 instance NoThunks Asset
+
+-- | Type-safe quantity indexed by asset type
+newtype Quantity (asset :: Asset) = Quantity Natural
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving newtype Num
+  deriving anyclass NFData
+
+-- Manual NoThunks for indexed newtype
+instance NoThunks (Quantity asset) where
+  wNoThunks _ctx _ = return Nothing
+  showTypeOf _proxy = "Quantity"
 
 --------------------------------------------------------------------------------
 -- Chain GADT ------------------------------------------------------------------

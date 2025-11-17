@@ -65,8 +65,10 @@ import AtomicSwap.Simulator.State
   , getPartyState
   )
 import AtomicSwap.Simulator.Types
-  ( GlobalState
+  ( Asset (..)
+  , GlobalState
   , Participant (..)
+  , Quantity (..)
   , StateUpdate (..)
   , StepEntry
   , StepIndex (..)
@@ -144,7 +146,7 @@ mainPage simState =
                       ]
                       "Reset"
                 div_ [id_ "timeline", class_ "timeline"] do
-                  renderTimeline (ssGlobalState simState)
+                  renderTimeline (ssSwapAmounts simState) (ssGlobalState simState)
 
               -- Right column: Bob's state
               div_ [class_ "column bob-column"] do
@@ -163,15 +165,22 @@ mainPage simState =
 -- Timeline Rendering ----------------------------------------------------------
 
 -- | Render the complete execution timeline from history
-renderTimeline :: GlobalState -> Html ()
-renderTimeline globalState =
-  if null globalState
-    then div_ [class_ "timeline-item"] do
-      span_ [class_ "step-number"] "Step 0"
-      span_
-        [class_ "step-description"]
-        "Ready to begin. Generate keypairs for Alice and Bob."
-    else mapM_ renderTimelineEntry globalState
+renderTimeline :: (Quantity 'Apple, Quantity 'Banana) -> GlobalState -> Html ()
+renderTimeline (Quantity apples, Quantity bananas) globalState = do
+  -- Always render Step 0 first
+  div_ [class_ "timeline-item"] do
+    span_ [class_ "step-number"] "Step 0"
+    span_ [class_ "step-description"] $
+      toHtml
+        ( "Alice and Bob agree to exchange "
+            <> show apples
+            <> " 🍎 for "
+            <> show bananas
+            <> " 🍌"
+            :: Text
+        )
+  -- Then render all other steps
+  mapM_ renderTimelineEntry globalState
 
 -- | Render a single timeline entry
 renderTimelineEntry :: StepEntry -> Html ()
