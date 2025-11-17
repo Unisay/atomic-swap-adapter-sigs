@@ -144,6 +144,36 @@ test/AtomicSwap/
 
 ### Key Design Patterns
 
+**Interactive Simulator Architecture (State-Diffing + Event Sourcing)**:
+
+- **GlobalState**: Append-only log of StateUpdates (single source of truth)
+- **PartyState**: Read-only projections computed by folding GlobalState
+- **appendStep**: Only mutation point (appends to log, reconstructs all projections)
+- **Step Handlers**: Pure event appenders (`m ()` or `m Bool`), don't know about rendering
+- **HTTP Layer**: Diffs state before/after, detects changed parties, renders only affected UI panels
+- **Benefits**: Automatic cross-participant updates, simpler handlers, bug elimination
+
+Pattern for step execution:
+
+```haskell
+-- Handler (pure event appender)
+executeStep :: MonadSimulator m => m Bool
+executeStep = do
+  state <- getPartyState Alice  -- Read projection
+  applyUpdates Alice inputs [update1, update2]  -- Append to log
+  pure True  -- No rendering concern
+
+-- HTTP layer (state-diffing)
+handleStep = do
+  oldState <- readIORef stateRef
+  success <- runSimulatorT stateRef executeStep
+  newState <- readIORef stateRef
+  changedParties <- detectChangedParties oldState newState  -- Diff
+  respond $ renderStateUpdates changedParties newState  -- Render only changed
+```
+
+See `src/AtomicSwap/Simulator/State.hs:10-19` for detailed architecture documentation.
+
 **Cryptography (Zhu et al. 2024 rEdDSA)**:
 
 - Split private key: `(sk0, sk1)` where `sk0` = signing scalar, `sk1` = nonce seed

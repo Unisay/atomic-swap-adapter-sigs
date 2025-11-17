@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "toolPermissions": {
+        "mcp__sequential-thinking__sequentialthinking": "allow"
+      }
+    },
+    "ide": {
+      "toolPermissions": {
+        "mcp__ide__getDiagnostics": "allow",
+        "mcp__ide__executeCode": "ask"
+      }
+    }
+  }
+}

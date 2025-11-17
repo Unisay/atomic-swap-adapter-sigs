@@ -7,10 +7,11 @@ Users can step through the protocol execution with real-time state visualization
 -}
 module Main (main) where
 
-import Lucid (renderBS)
+import Lucid (Html, renderBS)
 import Network.HTTP.Types (status200, status400, status404)
 import Network.Wai
   ( Application
+  , Response
   , pathInfo
   , requestMethod
   , responseFile
@@ -24,14 +25,15 @@ import AtomicSwap.Simulator.Render
   , renderNewTimelineEntry
   , renderStateUpdates
   )
-import AtomicSwap.Simulator.Run (runSimulatorT)
+import AtomicSwap.Simulator.Run (SimulatorT, runSimulatorT)
 import AtomicSwap.Simulator.State
   ( SimulatorState
   , detectChangedParties
   , emptySimulatorState
   )
 import AtomicSwap.Simulator.Steps
-  ( executeAliceGenerateSecret
+  ( StepResult (..)
+  , executeAliceGenerateSecret
   , executeAliceKeygen
   , executeAliceMakeCommitment
   , executeAliceSendPublicKey
@@ -42,6 +44,56 @@ import Data.IORef.Strict (StrictIORef)
 import Data.IORef.Strict qualified as Strict
 
 --------------------------------------------------------------------------------
+-- HTML Response Helper --------------------------------------------------------
+
+htmlResponse :: Html () -> Response
+htmlResponse html =
+  responseLBS
+    status200
+    [ ("Content-Type", "text/html; charset=utf-8")
+    , ("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+    , ("Pragma", "no-cache")
+    , ("Expires", "0")
+    ]
+    (renderBS html)
+
+--------------------------------------------------------------------------------
+-- State-Diffing Combinator ----------------------------------------------------
+
+{- | Execute a step handler with automatic state-diffing and rendering
+
+This combinator encapsulates the state-diffing pattern:
+1. Read old state
+2. Execute handler
+3. Read new state (if succeeded)
+4. Detect changed parties
+5. Render timeline + changed panels (or error response)
+
+All handlers return StepResult for uniform interface.
+-}
+executeWithStateDiff
+  :: StrictIORef SimulatorState
+  -> SimulatorT StepResult
+  -> (Response -> IO a)
+  -> IO a
+executeWithStateDiff stateRef handler respond = do
+  oldState <- Strict.readIORef stateRef
+  result <- runSimulatorT stateRef handler
+  case result of
+    StepOk -> do
+      newState <- Strict.readIORef stateRef
+      let changedParties = detectChangedParties oldState newState
+      respond $ htmlResponse do
+        renderNewTimelineEntry newState
+        renderStateUpdates changedParties newState
+    StepFailed errorMsg ->
+      respond $
+        responseLBS
+          status400
+          [("Content-Type", "text/plain")]
+          ("Precondition not met: " <> encodeUtf8 errorMsg)
+
+--------------------------------------------------------------------------------
 -- Server Implementation -------------------------------------------------------
 
 mkApp :: StrictIORef SimulatorState -> Application
@@ -50,78 +102,18 @@ mkApp stateRef req respond =
     ("GET", []) -> do
       currentState <- Strict.readIORef stateRef
       respond $ htmlResponse (mainPage currentState)
-    ("POST", ["step", "alice-keygen"]) -> do
-      oldState <- Strict.readIORef stateRef
-      runSimulatorT stateRef executeAliceKeygen
-      newState <- Strict.readIORef stateRef
-      let changedParties = detectChangedParties oldState newState
-      respond $ htmlResponse do
-        renderNewTimelineEntry newState
-        renderStateUpdates changedParties newState
-    ("POST", ["step", "bob-keygen"]) -> do
-      oldState <- Strict.readIORef stateRef
-      runSimulatorT stateRef executeBobKeygen
-      newState <- Strict.readIORef stateRef
-      let changedParties = detectChangedParties oldState newState
-      respond $ htmlResponse do
-        renderNewTimelineEntry newState
-        renderStateUpdates changedParties newState
-    ("POST", ["step", "alice-generate-secret"]) -> do
-      oldState <- Strict.readIORef stateRef
-      runSimulatorT stateRef executeAliceGenerateSecret
-      newState <- Strict.readIORef stateRef
-      let changedParties = detectChangedParties oldState newState
-      respond $ htmlResponse do
-        renderNewTimelineEntry newState
-        renderStateUpdates changedParties newState
-    ("POST", ["step", "alice-make-commitment"]) -> do
-      oldState <- Strict.readIORef stateRef
-      success <- runSimulatorT stateRef executeAliceMakeCommitment
-      if success
-        then do
-          newState <- Strict.readIORef stateRef
-          let changedParties = detectChangedParties oldState newState
-          respond $ htmlResponse do
-            renderNewTimelineEntry newState
-            renderStateUpdates changedParties newState
-        else
-          respond $
-            responseLBS
-              status400
-              [("Content-Type", "text/plain")]
-              "Precondition not met: adapter secret not set"
-    ("POST", ["step", "alice-send-public-key"]) -> do
-      oldState <- Strict.readIORef stateRef
-      success <- runSimulatorT stateRef executeAliceSendPublicKey
-      if success
-        then do
-          newState <- Strict.readIORef stateRef
-          let changedParties = detectChangedParties oldState newState
-          respond $ htmlResponse do
-            renderNewTimelineEntry newState
-            renderStateUpdates changedParties newState
-        else
-          respond $
-            responseLBS
-              status400
-              [("Content-Type", "text/plain")]
-              "Precondition not met: Alice has no public key"
-    ("POST", ["step", "bob-send-public-key"]) -> do
-      oldState <- Strict.readIORef stateRef
-      success <- runSimulatorT stateRef executeBobSendPublicKey
-      if success
-        then do
-          newState <- Strict.readIORef stateRef
-          let changedParties = detectChangedParties oldState newState
-          respond $ htmlResponse do
-            renderNewTimelineEntry newState
-            renderStateUpdates changedParties newState
-        else
-          respond $
-            responseLBS
-              status400
-              [("Content-Type", "text/plain")]
-              "Precondition not met: Bob has no public key"
+    ("POST", ["step", "alice-keygen"]) ->
+      executeWithStateDiff stateRef executeAliceKeygen respond
+    ("POST", ["step", "bob-keygen"]) ->
+      executeWithStateDiff stateRef executeBobKeygen respond
+    ("POST", ["step", "alice-generate-secret"]) ->
+      executeWithStateDiff stateRef executeAliceGenerateSecret respond
+    ("POST", ["step", "alice-make-commitment"]) ->
+      executeWithStateDiff stateRef executeAliceMakeCommitment respond
+    ("POST", ["step", "alice-send-public-key"]) ->
+      executeWithStateDiff stateRef executeAliceSendPublicKey respond
+    ("POST", ["step", "bob-send-public-key"]) ->
+      executeWithStateDiff stateRef executeBobSendPublicKey respond
     ("POST", ["reset"]) -> do
       Strict.writeIORef stateRef emptySimulatorState
       currentState <- Strict.readIORef stateRef
@@ -135,16 +127,6 @@ mkApp stateRef req respond =
           Nothing
     _ ->
       respond $ responseLBS status404 [("Content-Type", "text/plain")] "Not Found"
-  where
-    htmlResponse html =
-      responseLBS
-        status200
-        [ ("Content-Type", "text/html; charset=utf-8")
-        , ("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-        , ("Pragma", "no-cache")
-        , ("Expires", "0")
-        ]
-        (renderBS html)
 
 main :: IO ()
 main = do

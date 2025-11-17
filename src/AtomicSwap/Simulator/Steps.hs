@@ -22,8 +22,13 @@ while the StateUpdate list can contain changes for ANY participant(s).
 Both party states are automatically recomputed from the append-only log.
 -}
 module AtomicSwap.Simulator.Steps
-  ( -- * Step Executors
-    executeAliceKeygen
+  ( -- * Step Result
+    StepResult (..)
+  , ok
+  , failed
+
+    -- * Step Executors
+  , executeAliceKeygen
   , executeBobKeygen
   , executeAliceGenerateSecret
   , executeAliceMakeCommitment
@@ -43,47 +48,67 @@ import AtomicSwap.Simulator.Types
 import Data.Strict.Maybe qualified as SM
 
 --------------------------------------------------------------------------------
+-- Step Result Type ------------------------------------------------------------
+
+-- | Result of executing a step handler
+data StepResult
+  = StepOk -- Precondition met, step executed
+  | StepFailed Text -- Precondition not met, error message
+  deriving stock (Show, Eq)
+
+-- | Smart constructor for success
+ok :: Monad m => m StepResult
+ok = pure StepOk
+
+-- | Smart constructor for failure
+failed :: Monad m => Text -> m StepResult
+failed = pure . StepFailed
+
+--------------------------------------------------------------------------------
 -- Step Executors --------------------------------------------------------------
 
 -- | Execute Alice's keypair generation step
-executeAliceKeygen :: MonadSimulator m => m ()
+executeAliceKeygen :: MonadSimulator m => m StepResult
 executeAliceKeygen = do
   (sk, pk) <- generateKeyPair
   applyUpdates
     Alice
     (UserInputs "")
     [SetPrivateKey Alice sk, SetPublicKey Alice pk]
+  ok
 
 -- | Execute Bob's keypair generation step
-executeBobKeygen :: MonadSimulator m => m ()
+executeBobKeygen :: MonadSimulator m => m StepResult
 executeBobKeygen = do
   (sk, pk) <- generateKeyPair
   applyUpdates Bob (UserInputs "") [SetPrivateKey Bob sk, SetPublicKey Bob pk]
+  ok
 
 -- | Execute Alice's adapter secret generation step
-executeAliceGenerateSecret :: MonadSimulator m => m ()
+executeAliceGenerateSecret :: MonadSimulator m => m StepResult
 executeAliceGenerateSecret = do
   secret <- generateAdapterSecret
   applyUpdates Alice (UserInputs "") [SetAdapterSecret Alice secret]
+  ok
 
 -- | Execute Alice's commitment generation step
-executeAliceMakeCommitment :: MonadSimulator m => m Bool
+executeAliceMakeCommitment :: MonadSimulator m => m StepResult
 executeAliceMakeCommitment = do
   aliceState <- getPartyState Alice
   case psAdapterSecret aliceState of
-    SM.Nothing -> pure False -- Precondition not met
+    SM.Nothing -> failed "adapter secret not set"
     SM.Just secret -> do
       commitment <- generateAdapterCommitment secret
       applyUpdates Alice (UserInputs "") [SetAdapterCommitment Alice commitment]
-      pure True
+      ok
 
 -- | Execute Alice sending her public key to Bob
-executeAliceSendPublicKey :: MonadSimulator m => m Bool
+executeAliceSendPublicKey :: MonadSimulator m => m StepResult
 executeAliceSendPublicKey = do
   -- 1. Read current state (read-only projection)
   aliceState <- getPartyState Alice
   case psPublicKey aliceState of
-    SM.Nothing -> pure False -- Alice hasn't generated keys yet
+    SM.Nothing -> failed "Alice has no public key"
     SM.Just alicePk -> do
       -- 2. Append updates to GlobalState (Alice is the actor)
       --    Updates affect BOTH participants (Bob receives, Alice marks sent)
@@ -94,14 +119,14 @@ executeAliceSendPublicKey = do
         [ SetOtherPartyPublicKey Bob alicePk -- Bob's state changes
         , SetSentPublicKey Alice True -- Alice's state changes
         ]
-      pure True
+      ok
 
 -- | Execute Bob sending his public key to Alice
-executeBobSendPublicKey :: MonadSimulator m => m Bool
+executeBobSendPublicKey :: MonadSimulator m => m StepResult
 executeBobSendPublicKey = do
   bobState <- getPartyState Bob
   case psPublicKey bobState of
-    SM.Nothing -> pure False -- Bob hasn't generated keys yet
+    SM.Nothing -> failed "Bob has no public key"
     SM.Just bobPk -> do
       -- Alice receives Bob's public key, Bob marks as sent (cross-participant update)
       -- State-diffing will automatically detect both parties changed
@@ -111,4 +136,4 @@ executeBobSendPublicKey = do
         [ SetOtherPartyPublicKey Alice bobPk
         , SetSentPublicKey Bob True
         ]
-      pure True
+      ok
