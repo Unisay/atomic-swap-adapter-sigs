@@ -1,0 +1,34 @@
+# Cabal build artifacts
+dist-newstyle/
+dist/
+cabal.project.local
+.ghc.environment.*
+
+# Stack build artifacts (if ever used)
+.stack-work/
+
+# Nix
+result
+result-*
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Haskell
+*.hi
+*.o
+*.prof
+*.aux
+*.hp
+*.eventlog
+*.tix
+
+# Temporary files
+*.tmp
+.#*
+\#*\#

@@ -1,0 +1,104 @@
+cabal-version: 3.4
+name:          atomic-swap-adapter-sigs
+version:       0.1.0.0
+synopsis:
+  Educational tutorial on atomic swaps using adapter signatures
+
+description:
+  An interactive Haskell tutorial demonstrating end-to-end atomic swaps
+  between two blockchains using adapter signatures. Features multi-threaded
+  execution, verbose logging, and comprehensive documentation.
+
+author:        Yura
+license:       Apache-2.0
+category:      Blockchain, Education
+
+common common-deps
+  build-depends:
+    , aeson
+    , async
+    , base               >=4.16
+    , base16-bytestring
+    , bytestring
+    , containers
+    , cryptonite
+    , directory
+    , io-classes
+    , io-sim
+    , memory
+    , relude             ^>=1.2.2
+    , stm
+    , text
+
+common common-language
+  import:             common-deps
+  ghc-options:
+    -Wall -Wcompat -Wincomplete-uni-patterns -Wredundant-constraints
+    -Wmissing-export-lists -Wmissing-deriving-strategies
+    -Wpartial-fields -Wmissing-deriving-strategies
+    -Werror=missing-fields -fprint-explicit-foralls -Widentities
+    -Wredundant-bang-patterns -Wunused-type-patterns
+
+  default-language:   Haskell2010
+  mixins:
+    base hiding (Prelude),
+    relude (Relude as Prelude),
+    relude (Relude)
+
+  default-extensions:
+    BangPatterns
+    BlockArguments
+    DataKinds
+    DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
+    DerivingVia
+    FlexibleContexts
+    GeneralizedNewtypeDeriving
+    ImportQualifiedPost
+    LambdaCase
+    OverloadedStrings
+    ScopedTypeVariables
+    TypeApplications
+
+library
+  import:          common-language
+  exposed-modules:
+    AtomicSwap.Blockchain.Ledger
+    AtomicSwap.Blockchain.Transaction
+    AtomicSwap.Blockchain.Types
+    AtomicSwap.Crypto.Adapter
+    AtomicSwap.Crypto.Keys
+    AtomicSwap.Crypto.NIZK
+    AtomicSwap.Crypto.Signatures
+    AtomicSwap.Logging
+    AtomicSwap.Prelude
+    AtomicSwap.Protocol.Alice
+    AtomicSwap.Protocol.Bob
+    AtomicSwap.Protocol.Messaging
+    AtomicSwap.Types
+    AtomicSwap.Types.Orphans
+
+  hs-source-dirs:  src
+
+test-suite atomic-swap-tests
+  import:             common-language
+  type:               exitcode-stdio-1.0
+  main-is:            Spec.hs
+  other-modules:
+    AtomicSwap.BlockchainSpec
+    AtomicSwap.CryptoSpec
+    AtomicSwap.ErrorHandlingSpec
+    AtomicSwap.HappyPathSpec
+    AtomicSwap.RefundSpec
+
+  build-depends:
+    , atomic-swap-adapter-sigs
+    , hspec
+    , QuickCheck
+    , quickcheck-instances
+    , temporary
+
+  hs-source-dirs:     test
+  ghc-options:        -threaded -rtsopts -with-rtsopts=-N
+  build-tool-depends: hspec-discover:hspec-discover

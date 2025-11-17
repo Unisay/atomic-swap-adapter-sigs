@@ -1,0 +1,3 @@
+# HLint configuration for atomic-swap-adapter-sigs
+
+- ignore: { name: "Eta reduce" }
