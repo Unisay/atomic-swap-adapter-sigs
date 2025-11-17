@@ -162,7 +162,7 @@ body {
   padding: 15px;
   background: #f0f9ff;
   border-radius: 8px;
-  max-width: 70%;
+  width: 100%;
   position: relative;
 }
 
@@ -249,12 +249,10 @@ body {
   transform: translateY(0);
 }
 
-/* Timeline event styling by party - chat-style alignment */
+/* Timeline event styling by party - full-width */
 .alice-event {
   background: #f3e8ff;
   border-left: 4px solid #7c3aed;
-  align-self: flex-start;
-  margin-right: auto;
 }
 
 .alice-event .step-number {
@@ -263,10 +261,7 @@ body {
 
 .bob-event {
   background: #ecfdf5;
-  border-right: 4px solid #059669;
-  align-self: flex-end;
-  margin-left: auto;
-  text-align: right;
+  border-left: 4px solid #059669;
 }
 
 .bob-event .step-number {

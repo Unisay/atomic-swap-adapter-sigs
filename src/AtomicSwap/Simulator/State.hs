@@ -6,6 +6,17 @@ Description: State management for atomic swap simulator
 
 This module provides state management using an append-only log with
 fold-based reconstruction for time-travel debugging capabilities.
+
+= Architecture
+
+The design follows Event Sourcing principles:
+
+* 'GlobalState' - Append-only log of state updates (source of truth)
+* 'PartyState' - Read-only projections computed by folding GlobalState
+* 'appendStep' - Only way to modify state (appends to GlobalState)
+* 'reconstructState' - Rebuilds both party states from GlobalState
+
+This ensures time-travel debugging and deterministic state reconstruction.
 -}
 module AtomicSwap.Simulator.State
   ( -- * State Management
@@ -20,6 +31,9 @@ module AtomicSwap.Simulator.State
     -- * State Reconstruction
   , applyUpdate
   , reconstructState
+
+    -- * State Diffing
+  , detectChangedParties
   ) where
 
 import Prelude hiding (Maybe, Seq, state)
@@ -35,10 +49,16 @@ import NoThunks.Class (NoThunks (..))
 --------------------------------------------------------------------------------
 -- Party State (Reconstructed from Updates) ------------------------------------
 
--- | Ephemeral party state computed from updates (fully strict via StrictData)
+{- | Ephemeral party state computed from updates (fully strict via StrictData)
+
+This is a READ-ONLY projection. Never modify directly - always append to
+GlobalState via 'appendStep', which will recompute both party states.
+-}
 data PartyState = PartyState
   { psPrivateKey :: SM.Maybe Ed25519PrivateKey
   , psPublicKey :: SM.Maybe PublicKey
+  , psOtherPartyPublicKey :: SM.Maybe PublicKey
+  , psSentPublicKey :: Bool
   , psAdapterSecret :: SM.Maybe AdapterSecret
   , psAdapterCommitment :: SM.Maybe AdapterPoint
   , psPreSignature :: SM.Maybe Signature
@@ -56,6 +76,8 @@ emptyPartyState =
     PartyState
       { psPrivateKey = SM.Nothing
       , psPublicKey = SM.Nothing
+      , psOtherPartyPublicKey = SM.Nothing
+      , psSentPublicKey = False
       , psAdapterSecret = SM.Nothing
       , psAdapterCommitment = SM.Nothing
       , psPreSignature = SM.Nothing
@@ -89,7 +111,16 @@ emptySimulatorState =
 --------------------------------------------------------------------------------
 -- State Operations ------------------------------------------------------------
 
--- | Append a new step to the global state
+{- | Append a new step to the global state (ONLY way to modify state)
+
+This is the sole mutation point. It:
+1. Appends a new entry to GlobalState (append-only log)
+2. Reconstructs BOTH party states from the complete GlobalState
+3. Returns new SimulatorState with updated projections
+
+The 'Participant' parameter indicates which party initiated the action,
+but the updates list can contain changes for ANY participant.
+-}
 appendStep
   :: Participant -> UserInputs -> [StateUpdate] -> SimulatorState -> SimulatorState
 appendStep participant inputs updates state =
@@ -119,6 +150,12 @@ applyUpdate party update partyState = case update of
   SetPublicKey p pk
     | p == party ->
         partyState {psPublicKey = SM.Just pk}
+  SetOtherPartyPublicKey p pk
+    | p == party ->
+        partyState {psOtherPartyPublicKey = SM.Just pk}
+  SetSentPublicKey p sent
+    | p == party ->
+        partyState {psSentPublicKey = sent}
   SetAdapterSecret p secret
     | p == party ->
         partyState {psAdapterSecret = SM.Just secret}
@@ -160,3 +197,17 @@ reconstructState globalState =
     , ssAliceState = L.fold aliceStateFold globalState
     , ssBobState = L.fold bobStateFold globalState
     }
+
+--------------------------------------------------------------------------------
+-- State Diffing ---------------------------------------------------------------
+
+{- | Detect which parties' states changed between two simulator states
+
+Used for automatic UI updates: only render panels for parties whose state
+actually changed after a step execution.
+-}
+detectChangedParties :: SimulatorState -> SimulatorState -> [Participant]
+detectChangedParties oldState newState =
+  let aliceChanged = ssAliceState oldState /= ssAliceState newState
+      bobChanged = ssBobState oldState /= ssBobState newState
+   in [Alice | aliceChanged] <> [Bob | bobChanged]

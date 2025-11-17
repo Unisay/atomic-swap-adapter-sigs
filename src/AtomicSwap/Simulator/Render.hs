@@ -18,8 +18,9 @@ module AtomicSwap.Simulator.Render
   ( -- * Page Templates
     mainPage
 
-    -- * Step Renderer
-  , renderStep
+    -- * State-Diffing Renderers
+  , renderStateUpdates
+  , renderNewTimelineEntry
   ) where
 
 import Lucid
@@ -63,7 +64,6 @@ import AtomicSwap.Simulator.State
   , SimulatorState (..)
   , getPartyState
   )
-import AtomicSwap.Simulator.Steps (RenderContext (..))
 import AtomicSwap.Simulator.Types
   ( GlobalState
   , Participant (..)
@@ -190,6 +190,10 @@ describeUpdates participant updates =
       case participant of
         Alice -> "Alice generated Ed25519 keypair"
         Bob -> "Bob generated Ed25519 keypair"
+    [SetOtherPartyPublicKey Bob _, SetSentPublicKey Alice _] ->
+      "Alice shared her public key with Bob"
+    [SetOtherPartyPublicKey Alice _, SetSentPublicKey Bob _] ->
+      "Bob shared his public key with Alice"
     [SetAdapterSecret _ _] ->
       "Alice generated adapter secret y"
     [SetAdapterCommitment _ _] ->
@@ -218,28 +222,32 @@ hxSwapOob_ :: Text -> Attributes
 hxSwapOob_ value = term "hx-swap-oob" value
 
 --------------------------------------------------------------------------------
--- Main Renderer ---------------------------------------------------------------
+-- State-Diffing Renderers -----------------------------------------------------
 
--- | Render a step execution result (ELM-style: full state render)
-renderStep :: RenderContext -> Text -> Html ()
-renderStep (RenderContext stepNum participant partyState) description = do
-  -- Timeline event
-  let eventClass = case participant of
-        Alice -> "timeline-item alice-event"
-        Bob -> "timeline-item bob-event"
-  div_ [class_ eventClass] do
-    span_ [class_ "step-number"] $ "Step " <> show stepNum
-    span_ [class_ "step-description"] $ toHtml description
+{- | Render state updates for changed parties (state-diffing approach)
 
-  -- Update party state (OOB)
-  case participant of
-    Alice -> renderAliceStateUpdate partyState
-    Bob -> renderBobStateUpdate partyState
+Takes list of changed participants and renders their state/action panels
+via HTMX out-of-band swaps. Used after detecting which parties changed.
+-}
+renderStateUpdates :: [Participant] -> SimulatorState -> Html ()
+renderStateUpdates changedParties simState =
+  forM_ changedParties \case
+    Alice -> do
+      let aliceState = getPartyState Alice simState
+      renderAliceStateUpdate aliceState
+      renderAliceActionsUpdate aliceState
+    Bob -> do
+      let bobState = getPartyState Bob simState
+      renderBobStateUpdate bobState
+      renderBobActionsUpdate bobState
 
-  -- Update party actions (OOB)
-  case participant of
-    Alice -> renderAliceActionsUpdate partyState
-    Bob -> renderBobActionsUpdate partyState
+{- | Render new timeline entry from the latest step in GlobalState
+
+Reads the last entry from GlobalState to create timeline event.
+-}
+renderNewTimelineEntry :: SimulatorState -> Html ()
+renderNewTimelineEntry simState =
+  for_ (viaNonEmpty last (ssGlobalState simState)) renderTimelineEntry
 
 --------------------------------------------------------------------------------
 -- State Rendering -------------------------------------------------------------
@@ -278,6 +286,18 @@ renderAliceStateFields partyState = do
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Public Key"
+        span_ [class_ "state-value"] "[not set]"
+  -- Bob's Public Key (received from Bob)
+  case SM.maybe Nothing Just (psOtherPartyPublicKey partyState) of
+    Just (PublicKey pkBytes) -> do
+      div_ [class_ "state-item state-set"] do
+        span_ [class_ "state-label"] "Bob's Public Key"
+        span_ [class_ "state-value", title_ (formatHex pkBytes)] $
+          toHtml $
+            formatHex pkBytes
+    Nothing -> do
+      div_ [class_ "state-item state-unset"] do
+        span_ [class_ "state-label"] "Bob's Public Key"
         span_ [class_ "state-value"] "[not set]"
   -- Adapter Secret
   case SM.maybe Nothing Just (psAdapterSecret partyState) of
@@ -346,6 +366,18 @@ renderBobStateFields partyState = do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Public Key"
         span_ [class_ "state-value"] "[not set]"
+  -- Alice's Public Key (received from Alice)
+  case SM.maybe Nothing Just (psOtherPartyPublicKey partyState) of
+    Just (PublicKey pkBytes) -> do
+      div_ [class_ "state-item state-set"] do
+        span_ [class_ "state-label"] "Alice's Public Key"
+        span_ [class_ "state-value", title_ (formatHex pkBytes)] $
+          toHtml $
+            formatHex pkBytes
+    Nothing -> do
+      div_ [class_ "state-item state-unset"] do
+        span_ [class_ "state-label"] "Alice's Public Key"
+        span_ [class_ "state-value"] "[not set]"
   -- Extracted Secret (Bob only)
   div_ [class_ "state-item state-unset"] do
     span_ [class_ "state-label"] "Extracted Secret"
@@ -365,6 +397,7 @@ renderBobStateUpdate partyState = do
 renderAliceActionsFields :: PartyState -> Html ()
 renderAliceActionsFields partyState = do
   let hasPublicKey = SM.isJust (psPublicKey partyState)
+      sentPublicKey = psSentPublicKey partyState
       hasSecret = SM.isJust (psAdapterSecret partyState)
       hasCommitment = SM.isJust (psAdapterCommitment partyState)
       hasAnyActions = not hasPublicKey || not hasSecret || (hasSecret && not hasCommitment)
@@ -381,6 +414,15 @@ renderAliceActionsFields partyState = do
           , hxSwap_ "beforeend"
           ]
           "Generate keypair"
+      -- Show send public key button if has key but hasn't sent it yet
+      when (hasPublicKey && not sentPublicKey) $
+        button_
+          [ class_ "party-button alice-button"
+          , hxPost_ "/step/alice-send-public-key"
+          , hxTarget_ "#timeline"
+          , hxSwap_ "beforeend"
+          ]
+          "Send Public Key to Bob"
       -- Show secret button ONLY if not generated
       unless hasSecret $
         button_
@@ -411,17 +453,28 @@ renderAliceActionsUpdate partyState = do
 renderBobActionsFields :: PartyState -> Html ()
 renderBobActionsFields partyState = do
   let hasPublicKey = SM.isJust (psPublicKey partyState)
+      sentPublicKey = psSentPublicKey partyState
 
-  unless hasPublicKey $
-    button_
-      [ class_ "party-button bob-button"
-      , hxPost_ "/step/bob-keygen"
-      , hxTarget_ "#timeline"
-      , hxSwap_ "beforeend"
-      ]
-      "Generate keypair"
-  when hasPublicKey $
-    div_ [class_ "no-actions"] "Waiting for Alice..."
+  if not hasPublicKey
+    then
+      button_
+        [ class_ "party-button bob-button"
+        , hxPost_ "/step/bob-keygen"
+        , hxTarget_ "#timeline"
+        , hxSwap_ "beforeend"
+        ]
+        "Generate keypair"
+    else do
+      -- Show send public key button only if hasn't sent yet
+      unless sentPublicKey $
+        button_
+          [ class_ "party-button bob-button"
+          , hxPost_ "/step/bob-send-public-key"
+          , hxTarget_ "#timeline"
+          , hxSwap_ "beforeend"
+          ]
+          "Send Public Key to Alice"
+      div_ [class_ "no-actions"] "Waiting for Alice..."
 
 -- | Render Bob's actions with OOB wrapper
 renderBobActionsUpdate :: PartyState -> Html ()

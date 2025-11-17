@@ -19,14 +19,24 @@ import Network.Wai
 import Network.Wai.Handler.Warp (run)
 
 -- Crypto and Simulator imports
-import AtomicSwap.Simulator.Render (mainPage, renderStep)
+import AtomicSwap.Simulator.Render
+  ( mainPage
+  , renderNewTimelineEntry
+  , renderStateUpdates
+  )
 import AtomicSwap.Simulator.Run (runSimulatorT)
-import AtomicSwap.Simulator.State (SimulatorState, emptySimulatorState)
+import AtomicSwap.Simulator.State
+  ( SimulatorState
+  , detectChangedParties
+  , emptySimulatorState
+  )
 import AtomicSwap.Simulator.Steps
   ( executeAliceGenerateSecret
   , executeAliceKeygen
   , executeAliceMakeCommitment
+  , executeAliceSendPublicKey
   , executeBobKeygen
+  , executeBobSendPublicKey
   )
 import Data.IORef.Strict (StrictIORef)
 import Data.IORef.Strict qualified as Strict
@@ -41,24 +51,77 @@ mkApp stateRef req respond =
       currentState <- Strict.readIORef stateRef
       respond $ htmlResponse (mainPage currentState)
     ("POST", ["step", "alice-keygen"]) -> do
-      ctx <- runSimulatorT stateRef executeAliceKeygen
-      respond $ htmlResponse $ renderStep ctx "Alice generated Ed25519 keypair"
+      oldState <- Strict.readIORef stateRef
+      runSimulatorT stateRef executeAliceKeygen
+      newState <- Strict.readIORef stateRef
+      let changedParties = detectChangedParties oldState newState
+      respond $ htmlResponse do
+        renderNewTimelineEntry newState
+        renderStateUpdates changedParties newState
     ("POST", ["step", "bob-keygen"]) -> do
-      ctx <- runSimulatorT stateRef executeBobKeygen
-      respond $ htmlResponse $ renderStep ctx "Bob generated Ed25519 keypair"
+      oldState <- Strict.readIORef stateRef
+      runSimulatorT stateRef executeBobKeygen
+      newState <- Strict.readIORef stateRef
+      let changedParties = detectChangedParties oldState newState
+      respond $ htmlResponse do
+        renderNewTimelineEntry newState
+        renderStateUpdates changedParties newState
     ("POST", ["step", "alice-generate-secret"]) -> do
-      ctx <- runSimulatorT stateRef executeAliceGenerateSecret
-      respond $ htmlResponse $ renderStep ctx "Alice generated adapter secret y"
+      oldState <- Strict.readIORef stateRef
+      runSimulatorT stateRef executeAliceGenerateSecret
+      newState <- Strict.readIORef stateRef
+      let changedParties = detectChangedParties oldState newState
+      respond $ htmlResponse do
+        renderNewTimelineEntry newState
+        renderStateUpdates changedParties newState
     ("POST", ["step", "alice-make-commitment"]) -> do
-      maybeCtx <- runSimulatorT stateRef executeAliceMakeCommitment
-      case maybeCtx of
-        Just ctx -> respond $ htmlResponse $ renderStep ctx "Alice computed commitment Y = y·B"
-        Nothing ->
+      oldState <- Strict.readIORef stateRef
+      success <- runSimulatorT stateRef executeAliceMakeCommitment
+      if success
+        then do
+          newState <- Strict.readIORef stateRef
+          let changedParties = detectChangedParties oldState newState
+          respond $ htmlResponse do
+            renderNewTimelineEntry newState
+            renderStateUpdates changedParties newState
+        else
           respond $
             responseLBS
               status400
               [("Content-Type", "text/plain")]
               "Precondition not met: adapter secret not set"
+    ("POST", ["step", "alice-send-public-key"]) -> do
+      oldState <- Strict.readIORef stateRef
+      success <- runSimulatorT stateRef executeAliceSendPublicKey
+      if success
+        then do
+          newState <- Strict.readIORef stateRef
+          let changedParties = detectChangedParties oldState newState
+          respond $ htmlResponse do
+            renderNewTimelineEntry newState
+            renderStateUpdates changedParties newState
+        else
+          respond $
+            responseLBS
+              status400
+              [("Content-Type", "text/plain")]
+              "Precondition not met: Alice has no public key"
+    ("POST", ["step", "bob-send-public-key"]) -> do
+      oldState <- Strict.readIORef stateRef
+      success <- runSimulatorT stateRef executeBobSendPublicKey
+      if success
+        then do
+          newState <- Strict.readIORef stateRef
+          let changedParties = detectChangedParties oldState newState
+          respond $ htmlResponse do
+            renderNewTimelineEntry newState
+            renderStateUpdates changedParties newState
+        else
+          respond $
+            responseLBS
+              status400
+              [("Content-Type", "text/plain")]
+              "Precondition not met: Bob has no public key"
     ("POST", ["reset"]) -> do
       Strict.writeIORef stateRef emptySimulatorState
       currentState <- Strict.readIORef stateRef
@@ -76,7 +139,11 @@ mkApp stateRef req respond =
     htmlResponse html =
       responseLBS
         status200
-        [("Content-Type", "text/html; charset=utf-8")]
+        [ ("Content-Type", "text/html; charset=utf-8")
+        , ("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        , ("Pragma", "no-cache")
+        , ("Expires", "0")
+        ]
         (renderBS html)
 
 main :: IO ()

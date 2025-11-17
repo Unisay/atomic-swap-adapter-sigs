@@ -90,6 +90,8 @@ data StateUpdate
   = -- Cryptographic state
     SetPrivateKey Participant Ed25519PrivateKey
   | SetPublicKey Participant PublicKey
+  | SetOtherPartyPublicKey Participant PublicKey
+  | SetSentPublicKey Participant Bool
   | SetAdapterSecret Participant AdapterSecret
   | SetAdapterCommitment Participant AdapterPoint
   | SetPreSignature Participant Signature
