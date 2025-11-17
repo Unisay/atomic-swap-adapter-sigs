@@ -33,6 +33,7 @@ import AtomicSwap.Simulator.State
   )
 import AtomicSwap.Simulator.Steps
   ( StepResult (..)
+  , executeAliceCompleteSignature
   , executeAliceCreatePreSignature
   , executeAliceGenerateNIZKProof
   , executeAliceGenerateSecret
@@ -43,8 +44,15 @@ import AtomicSwap.Simulator.Steps
   , executeAliceSendCommitment
   , executeAliceSendNIZKProof
   , executeAliceSendPublicKey
+  , executeAliceVerifyBobPreSignature
+  , executeBobCompleteSignature
+  , executeBobCreatePreSignature
+  , executeBobExtractSecret
   , executeBobKeygen
+  , executeBobPrepareTransaction
+  , executeBobPublishPreSignature
   , executeBobSendPublicKey
+  , executeBobVerifyAlicePreSignature
   , executeBobVerifyNIZKProof
   )
 import AtomicSwap.Simulator.Types (Asset (..), Quantity (..))
@@ -137,6 +145,22 @@ mkApp stateRef req respond =
       executeWithStateDiff stateRef executeAliceCreatePreSignature respond
     ("POST", ["step", "alice-publish-pre-signature"]) ->
       executeWithStateDiff stateRef executeAlicePublishPreSignature respond
+    ("POST", ["step", "bob-verify-alice-pre-signature"]) ->
+      executeWithStateDiff stateRef executeBobVerifyAlicePreSignature respond
+    ("POST", ["step", "bob-prepare-transaction"]) ->
+      executeWithStateDiff stateRef executeBobPrepareTransaction respond
+    ("POST", ["step", "bob-create-pre-signature"]) ->
+      executeWithStateDiff stateRef executeBobCreatePreSignature respond
+    ("POST", ["step", "bob-publish-pre-signature"]) ->
+      executeWithStateDiff stateRef executeBobPublishPreSignature respond
+    ("POST", ["step", "alice-verify-bob-pre-signature"]) ->
+      executeWithStateDiff stateRef executeAliceVerifyBobPreSignature respond
+    ("POST", ["step", "alice-complete-signature"]) ->
+      executeWithStateDiff stateRef executeAliceCompleteSignature respond
+    ("POST", ["step", "bob-extract-secret"]) ->
+      executeWithStateDiff stateRef executeBobExtractSecret respond
+    ("POST", ["step", "bob-complete-signature"]) ->
+      executeWithStateDiff stateRef executeBobCompleteSignature respond
     ("POST", ["reset"]) -> do
       -- Generate new random amounts for the swap (ensuring they're different)
       (apples, bananas) <- generateDifferentAmounts

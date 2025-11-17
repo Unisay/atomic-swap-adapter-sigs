@@ -73,8 +73,28 @@ data PartyState = PartyState
   , psSentPreSignature :: Bool
   , psOtherPartyTransaction :: SM.Maybe Transaction
   , psOtherPartyPreSignature :: SM.Maybe AdaptedSignature
+  , psPreSignatureVerified :: Bool
+  , psCompleteSignature :: SM.Maybe Signature
+  , psOtherPartyCompleteSignature :: SM.Maybe Signature
+  , psExtractedSecret :: SM.Maybe AdapterSecret
   , psObservedTxs :: Seq.Seq TxId
   , psIsWaiting :: Bool
+  , -- Fresh flags (True if field was updated in most recent step)
+    psPrivateKeyFresh :: Bool
+  , psPublicKeyFresh :: Bool
+  , psOtherPartyPublicKeyFresh :: Bool
+  , psAdapterSecretFresh :: Bool
+  , psAdapterCommitmentFresh :: Bool
+  , psNIZKProofFresh :: Bool
+  , psNIZKProofVerifiedFresh :: Bool
+  , psTransactionFresh :: Bool
+  , psPreSignatureFresh :: Bool
+  , psOtherPartyTransactionFresh :: Bool
+  , psOtherPartyPreSignatureFresh :: Bool
+  , psPreSignatureVerifiedFresh :: Bool
+  , psCompleteSignatureFresh :: Bool
+  , psOtherPartyCompleteSignatureFresh :: Bool
+  , psExtractedSecretFresh :: Bool
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass NFData
@@ -102,8 +122,28 @@ emptyPartyState =
       , psSentPreSignature = False
       , psOtherPartyTransaction = SM.Nothing
       , psOtherPartyPreSignature = SM.Nothing
+      , psPreSignatureVerified = False
+      , psCompleteSignature = SM.Nothing
+      , psOtherPartyCompleteSignature = SM.Nothing
+      , psExtractedSecret = SM.Nothing
       , psObservedTxs = Seq.empty
       , psIsWaiting = False
+      , -- Fresh flags
+        psPrivateKeyFresh = False
+      , psPublicKeyFresh = False
+      , psOtherPartyPublicKeyFresh = False
+      , psAdapterSecretFresh = False
+      , psAdapterCommitmentFresh = False
+      , psNIZKProofFresh = False
+      , psNIZKProofVerifiedFresh = False
+      , psTransactionFresh = False
+      , psPreSignatureFresh = False
+      , psOtherPartyTransactionFresh = False
+      , psOtherPartyPreSignatureFresh = False
+      , psPreSignatureVerifiedFresh = False
+      , psCompleteSignatureFresh = False
+      , psOtherPartyCompleteSignatureFresh = False
+      , psExtractedSecretFresh = False
       }
 
 --------------------------------------------------------------------------------
@@ -173,7 +213,43 @@ getStepCount = length . ssGlobalState
 --------------------------------------------------------------------------------
 -- State Reconstruction --------------------------------------------------------
 
--- | Apply a single state update to party state
+-- | Mark fields as fresh based on recent updates (called after reconstruction)
+markFreshFields :: Participant -> [StateUpdate] -> PartyState -> PartyState
+markFreshFields party updates state =
+  state
+    { psPrivateKeyFresh =
+        any (\case SetPrivateKey p _ -> p == party; _ -> False) updates
+    , psPublicKeyFresh =
+        any (\case SetPublicKey p _ -> p == party; _ -> False) updates
+    , psOtherPartyPublicKeyFresh =
+        any (\case SetOtherPartyPublicKey p _ -> p == party; _ -> False) updates
+    , psAdapterSecretFresh =
+        any (\case SetAdapterSecret p _ -> p == party; _ -> False) updates
+    , psAdapterCommitmentFresh =
+        any (\case SetAdapterCommitment p _ -> p == party; _ -> False) updates
+    , psNIZKProofFresh =
+        any (\case SetNIZKProof p _ -> p == party; _ -> False) updates
+    , psNIZKProofVerifiedFresh =
+        any (\case SetNIZKProofVerified p _ -> p == party; _ -> False) updates
+    , psTransactionFresh =
+        any (\case SetTransaction p _ -> p == party; _ -> False) updates
+    , psPreSignatureFresh =
+        any (\case SetPreSignature p _ -> p == party; _ -> False) updates
+    , psOtherPartyTransactionFresh =
+        any (\case SetOtherPartyTransaction p _ -> p == party; _ -> False) updates
+    , psOtherPartyPreSignatureFresh =
+        any (\case SetOtherPartyPreSignature p _ -> p == party; _ -> False) updates
+    , psPreSignatureVerifiedFresh =
+        any (\case SetPreSignatureVerified p _ -> p == party; _ -> False) updates
+    , psCompleteSignatureFresh =
+        any (\case SetCompleteSignature p _ -> p == party; _ -> False) updates
+    , psOtherPartyCompleteSignatureFresh =
+        any (\case SetOtherPartyCompleteSignature p _ -> p == party; _ -> False) updates
+    , psExtractedSecretFresh =
+        any (\case SetExtractedSecret p _ -> p == party; _ -> False) updates
+    }
+
+-- | Apply a single state update to party state (does not set fresh flags)
 applyUpdate :: Participant -> StateUpdate -> PartyState -> PartyState
 applyUpdate party update partyState = case update of
   SetPrivateKey p sk
@@ -227,6 +303,18 @@ applyUpdate party update partyState = case update of
   SetOtherPartyPreSignature p sig
     | p == party ->
         partyState {psOtherPartyPreSignature = SM.Just sig}
+  SetPreSignatureVerified p verified
+    | p == party ->
+        partyState {psPreSignatureVerified = verified}
+  SetCompleteSignature p sig
+    | p == party ->
+        partyState {psCompleteSignature = SM.Just sig}
+  SetOtherPartyCompleteSignature p sig
+    | p == party ->
+        partyState {psOtherPartyCompleteSignature = SM.Just sig}
+  SetExtractedSecret p secret
+    | p == party ->
+        partyState {psExtractedSecret = SM.Just secret}
   SetThreadWaiting p waiting
     | p == party ->
         partyState {psIsWaiting = waiting}
@@ -255,12 +343,24 @@ bobStateFold = L.Fold step emptyPartyState id
 reconstructState
   :: (Quantity 'Apple, Quantity 'Banana) -> GlobalState -> SimulatorState
 reconstructState swapAmounts globalState =
-  SimulatorState
-    { ssGlobalState = globalState
-    , ssAliceState = L.fold aliceStateFold globalState
-    , ssBobState = L.fold bobStateFold globalState
-    , ssSwapAmounts = swapAmounts
-    }
+  let
+    -- Reconstruct states from full history
+    baseAliceState = L.fold aliceStateFold globalState
+    baseBobState = L.fold bobStateFold globalState
+    -- Mark fresh fields only from the most recent step
+    (aliceState, bobState) = case viaNonEmpty last globalState of
+      Nothing -> (baseAliceState, baseBobState)
+      Just (_idx, _participant, _inputs, updates) ->
+        ( markFreshFields Alice updates baseAliceState
+        , markFreshFields Bob updates baseBobState
+        )
+   in
+    SimulatorState
+      { ssGlobalState = globalState
+      , ssAliceState = aliceState
+      , ssBobState = bobState
+      , ssSwapAmounts = swapAmounts
+      }
 
 --------------------------------------------------------------------------------
 -- State Diffing ---------------------------------------------------------------

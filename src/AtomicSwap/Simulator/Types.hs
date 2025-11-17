@@ -47,6 +47,14 @@ data Action
   | AlicePrepareTransaction
   | AliceCreatePreSignature
   | AlicePublishPreSignature
+  | BobVerifyAlicePreSignature
+  | BobPrepareTransaction
+  | BobCreatePreSignature
+  | BobPublishPreSignature
+  | AliceVerifyBobPreSignature
+  | AliceCompleteSignature
+  | BobExtractSecret
+  | BobCompleteSignature
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (NFData, NoThunks)
 
@@ -136,6 +144,10 @@ data StateUpdate
   | SetSentPreSignature Participant Bool
   | SetOtherPartyTransaction Participant Transaction
   | SetOtherPartyPreSignature Participant AdaptedSignature
+  | SetPreSignatureVerified Participant Bool
+  | SetCompleteSignature Participant Signature
+  | SetOtherPartyCompleteSignature Participant Signature
+  | SetExtractedSecret Participant AdapterSecret
   | -- Blockchain state
     PostTransaction SomeChain TxId Transaction
   | ObserveTransaction Participant SomeChain TxId

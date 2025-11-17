@@ -44,6 +44,14 @@ protocolOrder =
   , AlicePrepareTransaction
   , AliceCreatePreSignature
   , AlicePublishPreSignature
+  , BobVerifyAlicePreSignature
+  , BobPrepareTransaction
+  , BobCreatePreSignature
+  , BobPublishPreSignature
+  , AliceVerifyBobPreSignature
+  , AliceCompleteSignature
+  , BobExtractSecret
+  , BobCompleteSignature
   ]
 
 --------------------------------------------------------------------------------
@@ -82,6 +90,27 @@ canPerformAction simState action =
           SM.isJust (psTransaction alice) && SM.isNothing (psPreSignature alice)
         AlicePublishPreSignature ->
           SM.isJust (psPreSignature alice) && not (psSentPreSignature alice)
+        BobVerifyAlicePreSignature ->
+          SM.isJust (psOtherPartyTransaction bob)
+            && SM.isJust (psOtherPartyPreSignature bob)
+            && not (psPreSignatureVerified bob)
+        BobPrepareTransaction ->
+          psPreSignatureVerified bob && SM.isNothing (psTransaction bob)
+        BobCreatePreSignature ->
+          SM.isJust (psTransaction bob) && SM.isNothing (psPreSignature bob)
+        BobPublishPreSignature ->
+          SM.isJust (psPreSignature bob) && not (psSentPreSignature bob)
+        AliceVerifyBobPreSignature ->
+          SM.isJust (psOtherPartyTransaction alice)
+            && SM.isJust (psOtherPartyPreSignature alice)
+            && not (psPreSignatureVerified alice)
+        AliceCompleteSignature ->
+          psPreSignatureVerified alice && SM.isNothing (psCompleteSignature alice)
+        BobExtractSecret ->
+          SM.isJust (psOtherPartyCompleteSignature bob)
+            && SM.isNothing (psExtractedSecret bob)
+        BobCompleteSignature ->
+          SM.isJust (psExtractedSecret bob) && SM.isNothing (psCompleteSignature bob)
 
 -- | Get all currently available actions (in protocol order)
 availableActions :: SimulatorState -> [Action]
@@ -131,3 +160,25 @@ actionMetadata = \case
     ActionMetadata Alice "Create Pre-Sig" "/step/alice-create-pre-signature"
   AlicePublishPreSignature ->
     ActionMetadata Alice "Publish Pre-Sig" "/step/alice-publish-pre-signature"
+  BobVerifyAlicePreSignature ->
+    ActionMetadata
+      Bob
+      "Verify Alice's Pre-Sig"
+      "/step/bob-verify-alice-pre-signature"
+  BobPrepareTransaction ->
+    ActionMetadata Bob "Prepare Tx" "/step/bob-prepare-transaction"
+  BobCreatePreSignature ->
+    ActionMetadata Bob "Create Pre-Sig" "/step/bob-create-pre-signature"
+  BobPublishPreSignature ->
+    ActionMetadata Bob "Publish Pre-Sig" "/step/bob-publish-pre-signature"
+  AliceVerifyBobPreSignature ->
+    ActionMetadata
+      Alice
+      "Verify Bob's Pre-Sig"
+      "/step/alice-verify-bob-pre-signature"
+  AliceCompleteSignature ->
+    ActionMetadata Alice "Complete & Publish Sig" "/step/alice-complete-signature"
+  BobExtractSecret ->
+    ActionMetadata Bob "Extract Secret" "/step/bob-extract-secret"
+  BobCompleteSignature ->
+    ActionMetadata Bob "Complete & Publish Sig" "/step/bob-complete-signature"

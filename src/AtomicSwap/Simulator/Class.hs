@@ -69,3 +69,23 @@ class Monad m => MonadSimulator m where
     -> AdapterPoint
     -> NIZKProof
     -> m AdaptedSignature
+
+  -- | Verify adapter pre-signature
+  verifyPreSignature
+    :: PublicKey
+    -- ^ Signer's public key
+    -> Transaction
+    -- ^ Transaction being signed
+    -> AdapterPoint
+    -- ^ Adapter commitment point
+    -> AdaptedSignature
+    -- ^ Pre-signature to verify
+    -> NIZKProof
+    -- ^ NIZK proof for adapter commitment
+    -> m Bool
+
+  -- | Complete signature by adding adapter secret
+  completeSignature :: AdaptedSignature -> AdapterSecret -> m Signature
+
+  -- | Extract adapter secret from pre-signature and complete signature
+  extractSecret :: AdaptedSignature -> Signature -> m AdapterSecret

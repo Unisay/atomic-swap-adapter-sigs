@@ -93,3 +93,14 @@ instance MonadSimulator SimulatorT where
     SimulatorT $ ReaderT \_ -> do
       let txHash = Tx.hashTransaction tx
       Adapter.preSignREdDSA privKey pubKey txHash commitment proof
+
+  verifyPreSignature pubKey tx commitment preSig proof =
+    SimulatorT $ ReaderT \_ -> do
+      let txHash = Tx.hashTransaction tx
+      pure $ Adapter.preVerifyREdDSA pubKey txHash commitment preSig proof
+
+  completeSignature preSig secret = SimulatorT $ ReaderT \_ ->
+    pure $ Adapter.adaptSignature preSig secret
+
+  extractSecret preSig completeSig = SimulatorT $ ReaderT \_ ->
+    pure $ Adapter.extractAdapterSecret preSig completeSig

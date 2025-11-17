@@ -41,6 +41,14 @@ module AtomicSwap.Simulator.Steps
   , executeAlicePrepareTransaction
   , executeAliceCreatePreSignature
   , executeAlicePublishPreSignature
+  , executeBobVerifyAlicePreSignature
+  , executeBobPrepareTransaction
+  , executeBobCreatePreSignature
+  , executeBobPublishPreSignature
+  , executeAliceVerifyBobPreSignature
+  , executeAliceCompleteSignature
+  , executeBobExtractSecret
+  , executeBobCompleteSignature
   ) where
 
 import Prelude
@@ -260,4 +268,164 @@ executeAlicePublishPreSignature = do
         , SetOtherPartyTransaction Bob tx
         , SetOtherPartyPreSignature Bob preSig
         ]
+      ok
+
+--------------------------------------------------------------------------------
+-- Phase 3: Bob's Pre-Signature Steps ------------------------------------------
+
+-- | Execute Bob verifying Alice's pre-signature (Step 14 in protocol)
+executeBobVerifyAlicePreSignature :: MonadSimulator m => m StepResult
+executeBobVerifyAlicePreSignature = do
+  bobState <- getPartyState Bob
+  case ( psOtherPartyPublicKey bobState
+       , psOtherPartyTransaction bobState
+       , psOtherPartyCommitment bobState
+       , psOtherPartyPreSignature bobState
+       , psOtherPartyNIZKProof bobState
+       ) of
+    (SM.Nothing, _, _, _, _) -> failed "Alice's public key not received"
+    (_, SM.Nothing, _, _, _) -> failed "Alice's transaction not received"
+    (_, _, SM.Nothing, _, _) -> failed "Alice's commitment not received"
+    (_, _, _, SM.Nothing, _) -> failed "Alice's pre-signature not received"
+    (_, _, _, _, SM.Nothing) -> failed "Alice's NIZK proof not received"
+    (SM.Just alicePk, SM.Just tx, SM.Just commitment, SM.Just preSig, SM.Just proof) ->
+      do
+        isValid <- verifyPreSignature alicePk tx commitment preSig proof
+        if isValid
+          then do
+            applyUpdates Bob (UserInputs "") [SetPreSignatureVerified Bob True]
+            ok
+          else failed "Pre-signature verification failed"
+
+-- | Execute Bob preparing his transaction (Steps 15-16 in protocol)
+executeBobPrepareTransaction :: MonadSimulator m => m StepResult
+executeBobPrepareTransaction = do
+  bobState <- getPartyState Bob
+  case (psOtherPartyPublicKey bobState, psPreSignatureVerified bobState) of
+    (SM.Nothing, _) -> failed "Alice's public key not received"
+    (_, False) -> failed "Alice's pre-signature not verified yet"
+    (SM.Just alicePk, True) -> do
+      -- Get agreed swap amounts
+      (_, Quantity bananas) <- getSwapAmounts
+      -- Build transaction sending bananas to Alice
+      tx <- buildDummyTransaction alicePk bananas
+      applyUpdates Bob (UserInputs "") [SetTransaction Bob tx]
+      ok
+
+-- | Execute Bob creating his adapter pre-signature (Step 17 in protocol)
+executeBobCreatePreSignature :: MonadSimulator m => m StepResult
+executeBobCreatePreSignature = do
+  bobState <- getPartyState Bob
+  case ( psTransaction bobState
+       , psPrivateKey bobState
+       , psPublicKey bobState
+       , psOtherPartyCommitment bobState
+       , psOtherPartyNIZKProof bobState
+       ) of
+    (SM.Nothing, _, _, _, _) -> failed "Transaction not prepared"
+    (_, SM.Nothing, _, _, _) -> failed "Private key not set"
+    (_, _, SM.Nothing, _, _) -> failed "Public key not set"
+    (_, _, _, SM.Nothing, _) -> failed "Alice's commitment not received"
+    (_, _, _, _, SM.Nothing) -> failed "Alice's NIZK proof not received"
+    (SM.Just tx, SM.Just privKey, SM.Just pubKey, SM.Just commitment, SM.Just proof) ->
+      do
+        preSig <- createPreSignature privKey pubKey tx commitment proof
+        applyUpdates Bob (UserInputs "") [SetPreSignature Bob preSig]
+        ok
+
+-- | Execute Bob publishing pre-signature to Alice (Step 18 in protocol)
+executeBobPublishPreSignature :: MonadSimulator m => m StepResult
+executeBobPublishPreSignature = do
+  bobState <- getPartyState Bob
+  case (psTransaction bobState, psPreSignature bobState) of
+    (SM.Nothing, _) -> failed "Transaction not prepared"
+    (_, SM.Nothing) -> failed "Pre-signature not created"
+    (SM.Just tx, SM.Just preSig) -> do
+      -- Alice receives both transaction and pre-signature (cross-participant update)
+      applyUpdates
+        Bob
+        (UserInputs "")
+        [ SetSentPreSignature Bob True
+        , SetOtherPartyTransaction Alice tx
+        , SetOtherPartyPreSignature Alice preSig
+        ]
+      ok
+
+--------------------------------------------------------------------------------
+-- Phase 4: Alice Verifies and Completes --------------------------------------
+
+-- | Execute Alice verifying Bob's pre-signature (Steps 19-20 in protocol)
+executeAliceVerifyBobPreSignature :: MonadSimulator m => m StepResult
+executeAliceVerifyBobPreSignature = do
+  aliceState <- getPartyState Alice
+  case ( psOtherPartyPublicKey aliceState
+       , psOtherPartyTransaction aliceState
+       , psAdapterCommitment aliceState
+       , psOtherPartyPreSignature aliceState
+       , psNIZKProof aliceState
+       ) of
+    (SM.Nothing, _, _, _, _) -> failed "Bob's public key not received"
+    (_, SM.Nothing, _, _, _) -> failed "Bob's transaction not received"
+    (_, _, SM.Nothing, _, _) -> failed "Adapter commitment not set"
+    (_, _, _, SM.Nothing, _) -> failed "Bob's pre-signature not received"
+    (_, _, _, _, SM.Nothing) -> failed "NIZK proof not set"
+    (SM.Just bobPk, SM.Just tx, SM.Just commitment, SM.Just preSig, SM.Just proof) ->
+      do
+        isValid <- verifyPreSignature bobPk tx commitment preSig proof
+        if isValid
+          then do
+            applyUpdates Alice (UserInputs "") [SetPreSignatureVerified Alice True]
+            ok
+          else failed "Pre-signature verification failed"
+
+-- | Execute Alice completing and publishing her signature (Steps 21-25)
+executeAliceCompleteSignature :: MonadSimulator m => m StepResult
+executeAliceCompleteSignature = do
+  aliceState <- getPartyState Alice
+  case ( psPreSignature aliceState
+       , psAdapterSecret aliceState
+       , psPreSignatureVerified aliceState
+       ) of
+    (SM.Nothing, _, _) -> failed "Pre-signature not created"
+    (_, SM.Nothing, _) -> failed "Adapter secret not set"
+    (_, _, False) -> failed "Bob's pre-signature not verified yet"
+    (SM.Just preSig, SM.Just secret, True) -> do
+      -- Complete signature by adding adapter secret
+      completeSig <- completeSignature preSig secret
+      -- Alice publishes to blockchain, Bob observes (simulated by direct send)
+      applyUpdates
+        Alice
+        (UserInputs "")
+        [ SetCompleteSignature Alice completeSig
+        , SetOtherPartyCompleteSignature Bob completeSig -- Bob observes on-chain
+        ]
+      ok
+
+--------------------------------------------------------------------------------
+-- Phase 5: Bob Extracts Secret and Completes ---------------------------------
+
+-- | Execute Bob extracting adapter secret (Steps 26-29 in protocol)
+executeBobExtractSecret :: MonadSimulator m => m StepResult
+executeBobExtractSecret = do
+  bobState <- getPartyState Bob
+  case (psOtherPartyPreSignature bobState, psOtherPartyCompleteSignature bobState) of
+    (SM.Nothing, _) -> failed "Alice's pre-signature not received"
+    (_, SM.Nothing) -> failed "Alice's complete signature not observed on blockchain"
+    (SM.Just alicePreSig, SM.Just aliceCompleteSig) -> do
+      -- Extract adapter secret: y = sig - sig_tilde
+      extractedSecret <- extractSecret alicePreSig aliceCompleteSig
+      applyUpdates Bob (UserInputs "") [SetExtractedSecret Bob extractedSecret]
+      ok
+
+-- | Execute Bob completing and publishing his signature (Steps 30-34)
+executeBobCompleteSignature :: MonadSimulator m => m StepResult
+executeBobCompleteSignature = do
+  bobState <- getPartyState Bob
+  case (psPreSignature bobState, psExtractedSecret bobState) of
+    (SM.Nothing, _) -> failed "Pre-signature not created"
+    (_, SM.Nothing) -> failed "Adapter secret not extracted yet"
+    (SM.Just preSig, SM.Just secret) -> do
+      -- Complete signature using extracted adapter secret
+      completeSig <- completeSignature preSig secret
+      applyUpdates Bob (UserInputs "") [SetCompleteSignature Bob completeSig]
       ok

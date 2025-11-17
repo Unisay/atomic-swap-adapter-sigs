@@ -18,7 +18,7 @@ body {
 
 .header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 10px;
   padding: 20px;
   background: white;
   border-radius: 8px;
@@ -37,7 +37,7 @@ body {
 .main-content {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
-  gap: 20px;
+  gap: 10px;
   align-items: start;
 }
 
@@ -129,6 +129,21 @@ body {
   opacity: 0.6;
 }
 
+/* Highlight recently updated fields - only the value field */
+.recently-updated .state-label {
+  font-weight: 600;
+}
+
+.alice-column .state-set.recently-updated .state-value {
+  font-weight: 600;
+  border: 2px solid #a78bfa;
+}
+
+.bob-column .state-set.recently-updated .state-value {
+  font-weight: 600;
+  border: 2px solid #34d399;
+}
+
 .state-unset .state-value {
   color: #9ca3af;
   font-style: italic;
@@ -152,7 +167,14 @@ body {
 
 .timeline {
   margin-bottom: 20px;
-  min-height: 400px;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#timeline-entries {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -258,6 +280,15 @@ body {
   transform: translateY(0);
 }
 
+/* Non-recommended actions appear paler */
+.non-recommended {
+  opacity: 0.5;
+}
+
+.non-recommended:hover {
+  opacity: 0.7;
+}
+
 /* Timeline event styling by party - full-width */
 .alice-event {
   background: #f3e8ff;
@@ -281,12 +312,9 @@ body {
 .next-action-hint {
   margin-top: 15px;
   padding: 12px;
-  background: #fffbeb;
-  border: 1px dashed #fde68a;
-  border-radius: 6px;
   text-align: center;
   font-size: 13px;
-  color: #92400e;
+  color: #333;
   font-style: italic;
   display: flex;
   align-items: center;
@@ -310,4 +338,12 @@ body {
   text-transform: uppercase;
   font-style: normal;
   letter-spacing: 0.5px;
+}
+
+.next-action-button {
+  padding: 8px 14px !important;
+  font-size: 13px !important;
+  flex: 0 0 auto !important;
+  min-width: auto !important;
+  font-style: normal;
 }
