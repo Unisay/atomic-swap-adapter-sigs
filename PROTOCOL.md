@@ -7,115 +7,111 @@ This document describes the adapter signature-based atomic swap protocol impleme
 ## Protocol Flow Diagram
 
 ```mermaid
+---
+config:
+  theme: dark
+---
 sequenceDiagram
     autonumber
 
-    box LightBlue Swap Parties
+    box Swap Parties
         participant Alice
         participant Bob
     end
 
-    box LightGreen Blockchains
+    box Blockchains
         participant ChainA as Blockchain A
         participant ChainB as Blockchain B
     end
 
-    rect rgb(240, 248, 255)
-        Note over Alice,ChainB: Phase 1: Setup and Key Exchange
+    Note over Alice,ChainB: Phase 1: Setup and Key Exchange
 
-        par Key Generation
-            Alice->>+Alice: Generate keypair<br/>(sk0_A, sk1_A, pk_A)
-            Alice->>-Alice: Ready
-        and
-            Bob->>+Bob: Generate keypair<br/>(sk0_B, sk1_B, pk_B)
-            Bob->>-Bob: Ready
-        end
-
-        Alice->>Bob: Send pk_A
-        Bob->>Alice: Send pk_B
-
-        Note over Alice,Bob: Agree on swap terms:<br/>Alice: 10 ChainA tokens<br/>Bob: 5 ChainB tokens
-
-        Alice->>+Alice: Generate adapter secret y ∈ ℤ_q*
-        Alice->>Alice: Compute adapter point Y = y · B
-        Alice->>-Alice: Generate NIZK proof π = Prove_zk(Y, y)
-
-        Alice->>Bob: Send (Y, π)
-
-        Bob->>+Bob: Verify NIZK proof
-        Bob->>-Bob: Verify_zk(Y, π) = 1 ✓
+    par Key Generation
+        Alice->>+Alice: Generate keypair<br/>(sk0_A, sk1_A, pk_A)
+        Alice->>-Alice: Ready
+    and
+        Bob->>+Bob: Generate keypair<br/>(sk0_B, sk1_B, pk_B)
+        Bob->>-Bob: Ready
     end
 
-    rect rgb(255, 250, 240)
-        Note over Alice,ChainB: Phase 2: Adapted Pre-Signature Creation
+    Alice->>Bob: Send pk_A
+    Bob->>Alice: Send pk_B
 
-        Alice->>+ChainA: Query UTXO
-        ChainA-->>-Alice: UTXO confirmed (10 tokens)
+    Note over Alice,Bob: Agree on swap terms:<br/>Alice: 10 ChainA tokens<br/>Bob: 5 ChainB tokens
 
-        Alice->>+Alice: Build Tx_A: 10 tokens → pk_B
-        Alice->>Alice: Create adapted pre-signature σ_tilde_A:<br/>• r_A = H2(sk1_A ‖ Tx_A ‖ k_A)<br/>• R_sign_A = r_A·B + Y<br/>• sig_tilde_A = r_A + h_A·sk0_A
-        Alice->>-Alice: Pre-signature ready
+    Alice->>+Alice: Generate adapter secret y ∈ ℤ_q*
+    Alice->>Alice: Compute adapter point Y = y · B
+    Alice->>-Alice: Generate NIZK proof π = Prove_zk(Y, y)
 
-        Alice->>Bob: Send (Tx_A, σ_tilde_A)
+    Alice->>Bob: Send (Y, π)
 
-        critical Bob verifies Alice's pre-signature
-            Bob->>+Bob: Compute R'_A = R_sign_A - Y
-            Bob->>Bob: Compute h_A = H2(R_sign_A ‖ pk_A ‖ Tx_A)
-            Bob->>-Bob: Verify: sig_tilde_A·B = R'_A + h_A·pk_A ✓
-        option Verification fails
-            Bob->>Alice: Abort protocol
-        end
+    Bob->>+Bob: Verify NIZK proof
+    Bob->>-Bob: Verify_zk(Y, π) = 1 ✓
 
-        Bob->>+ChainB: Query UTXO
-        ChainB-->>-Bob: UTXO confirmed (5 tokens)
+    Note over Alice,ChainB: Phase 2: Adapted Pre-Signature Creation
 
-        Bob->>+Bob: Build Tx_B: 5 tokens → pk_A
-        Bob->>Bob: Create adapted pre-signature σ_tilde_B:<br/>• r_B = H2(sk1_B ‖ Tx_B ‖ k_B)<br/>• R_sign_B = r_B·B + Y (same Y!)<br/>• sig_tilde_B = r_B + h_B·sk0_B
-        Bob->>-Bob: Pre-signature ready
+    Alice->>+ChainA: Query UTXO
+    ChainA-->>-Alice: UTXO confirmed (10 tokens)
 
-        Bob->>Alice: Send (Tx_B, σ_tilde_B)
+    Alice->>+Alice: Build Tx_A: 10 tokens → pk_B
+    Alice->>Alice: Create adapted pre-signature σ_tilde_A:<br/>• r_A = H2(sk1_A ‖ Tx_A ‖ k_A)<br/>• R_sign_A = r_A·B + Y<br/>• sig_tilde_A = r_A + h_A·sk0_A
+    Alice->>-Alice: Pre-signature ready
+
+    Alice->>Bob: Send (Tx_A, σ_tilde_A)
+
+    critical Bob verifies Alice's pre-signature
+        Bob->>+Bob: Compute R'_A = R_sign_A - Y
+        Bob->>Bob: Compute h_A = H2(R_sign_A ‖ pk_A ‖ Tx_A)
+        Bob->>-Bob: Verify: sig_tilde_A·B = R'_A + h_A·pk_A ✓
+    option Verification fails
+        Bob->>Alice: Abort protocol
     end
 
-    rect rgb(240, 255, 240)
-        Note over Alice,ChainB: Phase 3: Pre-Signature Verification
+    Bob->>+ChainB: Query UTXO
+    ChainB-->>-Bob: UTXO confirmed (5 tokens)
 
-        critical Alice verifies Bob's pre-signature
-            Alice->>+Alice: Compute R'_B = R_sign_B - Y
-            Alice->>Alice: Compute h_B = H2(R_sign_B ‖ pk_B ‖ Tx_B)
-            Alice->>-Alice: Verify: sig_tilde_B·B = R'_B + h_B·pk_B ✓
-        option Verification fails
-            Alice->>Bob: Abort protocol
-        end
+    Bob->>+Bob: Build Tx_B: 5 tokens → pk_A
+    Bob->>Bob: Create adapted pre-signature σ_tilde_B:<br/>• r_B = H2(sk1_B ‖ Tx_B ‖ k_B)<br/>• R_sign_B = r_B·B + Y (same Y!)<br/>• sig_tilde_B = r_B + h_B·sk0_B
+    Bob->>-Bob: Pre-signature ready
 
-        Note over Alice,Bob: ✓ Both parties have verified adapted pre-signatures<br/>⚠ Neither can execute yet (both need y)
+    Bob->>Alice: Send (Tx_B, σ_tilde_B)
+
+    Note over Alice,ChainB: Phase 3: Pre-Signature Verification
+
+    critical Alice verifies Bob's pre-signature
+        Alice->>+Alice: Compute R'_B = R_sign_B - Y
+        Alice->>Alice: Compute h_B = H2(R_sign_B ‖ pk_B ‖ Tx_B)
+        Alice->>-Alice: Verify: sig_tilde_B·B = R'_B + h_B·pk_B ✓
+    option Verification fails
+        Alice->>Bob: Abort protocol
     end
 
-    rect rgb(255, 240, 245)
-        Note over Alice,ChainB: Phase 4: Atomic Execution
+    Note over Alice,Bob: ✓ Both parties have verified adapted pre-signatures<br/>⚠ Neither can execute yet (both need y)
 
-        Alice->>+Alice: Complete signature: sig_A = sig_tilde_A + y
-        Alice->>-ChainA: Publish Tx_A with σ_A = (R_sign_A, sig_A)
+    Note over Alice,ChainB: Phase 4: Atomic Execution
 
-        activate ChainA
-        ChainA->>ChainA: Verify: sig_A·B = R_sign_A + h_A·pk_A ✓
-        ChainA-->>Alice: ✓ Transaction confirmed<br/>Alice receives 5 tokens
-        deactivate ChainA
+    Alice->>+Alice: Complete signature: sig_A = sig_tilde_A + y
+    Alice->>-ChainA: Publish Tx_A with σ_A = (R_sign_A, sig_A)
 
-        Bob->>ChainA: Observe published Tx_A
+    activate ChainA
+    ChainA->>ChainA: Verify: sig_A·B = R_sign_A + h_A·pk_A ✓
+    ChainA-->>Alice: ✓ Transaction confirmed<br/>Alice receives 5 tokens
+    deactivate ChainA
 
-        critical Bob extracts adapter secret
-            Bob->>+Bob: Extract: y = sig_A - sig_tilde_A
-            Bob->>-Bob: Verify: Y = y·B ✓
-        end
+    Bob->>ChainA: Observe published Tx_A
 
-        Bob->>+Bob: Complete signature: sig_B = sig_tilde_B + y
-        Bob->>-ChainB: Publish Tx_B with σ_B = (R_sign_B, sig_B)
-
-        activate ChainB
-        ChainB->>ChainB: Verify: sig_B·B = R_sign_B + h_B·pk_B ✓
-        ChainB-->>Bob: ✓ Transaction confirmed<br/>Bob receives 10 tokens
-        deactivate ChainB
+    critical Bob extracts adapter secret
+        Bob->>+Bob: Extract: y = sig_A - sig_tilde_A
+        Bob->>-Bob: Verify: Y = y·B ✓
     end
+
+    Bob->>+Bob: Complete signature: sig_B = sig_tilde_B + y
+    Bob->>-ChainB: Publish Tx_B with σ_B = (R_sign_B, sig_B)
+
+    activate ChainB
+    ChainB->>ChainB: Verify: sig_B·B = R_sign_B + h_B·pk_B ✓
+    ChainB-->>Bob: ✓ Transaction confirmed<br/>Bob receives 10 tokens
+    deactivate ChainB
 
     Note over Alice,ChainB: 🎉 Swap Complete!<br/>Both parties have exchanged assets atomically
 ```
