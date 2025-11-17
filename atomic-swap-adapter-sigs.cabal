@@ -88,6 +88,7 @@ library
     AtomicSwap.Protocol.Alice
     AtomicSwap.Protocol.Bob
     AtomicSwap.Protocol.Messaging
+    AtomicSwap.Simulator.Actions
     AtomicSwap.Simulator.Class
     AtomicSwap.Simulator.Render
     AtomicSwap.Simulator.Run

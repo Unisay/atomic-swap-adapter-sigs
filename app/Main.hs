@@ -33,10 +33,13 @@ import AtomicSwap.Simulator.State
   )
 import AtomicSwap.Simulator.Steps
   ( StepResult (..)
+  , executeAliceCreatePreSignature
   , executeAliceGenerateNIZKProof
   , executeAliceGenerateSecret
   , executeAliceKeygen
   , executeAliceMakeCommitment
+  , executeAlicePrepareTransaction
+  , executeAlicePublishPreSignature
   , executeAliceSendCommitment
   , executeAliceSendNIZKProof
   , executeAliceSendPublicKey
@@ -128,6 +131,12 @@ mkApp stateRef req respond =
       executeWithStateDiff stateRef executeAliceSendNIZKProof respond
     ("POST", ["step", "bob-verify-nizk-proof"]) ->
       executeWithStateDiff stateRef executeBobVerifyNIZKProof respond
+    ("POST", ["step", "alice-prepare-transaction"]) ->
+      executeWithStateDiff stateRef executeAlicePrepareTransaction respond
+    ("POST", ["step", "alice-create-pre-signature"]) ->
+      executeWithStateDiff stateRef executeAliceCreatePreSignature respond
+    ("POST", ["step", "alice-publish-pre-signature"]) ->
+      executeWithStateDiff stateRef executeAlicePublishPreSignature respond
     ("POST", ["reset"]) -> do
       -- Generate new random amounts for the swap (ensuring they're different)
       (apples, bananas) <- generateDifferentAmounts

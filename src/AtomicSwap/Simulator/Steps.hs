@@ -38,6 +38,9 @@ module AtomicSwap.Simulator.Steps
   , executeAliceGenerateNIZKProof
   , executeAliceSendNIZKProof
   , executeBobVerifyNIZKProof
+  , executeAlicePrepareTransaction
+  , executeAliceCreatePreSignature
+  , executeAlicePublishPreSignature
   ) where
 
 import Prelude
@@ -46,6 +49,7 @@ import AtomicSwap.Simulator.Class (MonadSimulator (..))
 import AtomicSwap.Simulator.State (PartyState (..))
 import AtomicSwap.Simulator.Types
   ( Participant (..)
+  , Quantity (..)
   , StateUpdate (..)
   , UserInputs (..)
   )
@@ -200,3 +204,60 @@ executeBobVerifyNIZKProof = do
           applyUpdates Bob (UserInputs "") [SetNIZKProofVerified Bob True]
           ok
         else failed "NIZK proof verification failed"
+
+--------------------------------------------------------------------------------
+-- Phase 2: Pre-Signature Creation ---------------------------------------------
+
+-- | Execute Alice's transaction preparation (Step 1 of pre-signature phase)
+executeAlicePrepareTransaction :: MonadSimulator m => m StepResult
+executeAlicePrepareTransaction = do
+  aliceState <- getPartyState Alice
+  case (psOtherPartyPublicKey aliceState, psSentNIZKProof aliceState) of
+    (SM.Nothing, _) -> failed "Bob's public key not received"
+    (_, False) -> failed "NIZK proof not sent to Bob yet"
+    (SM.Just bobPk, True) -> do
+      -- Get agreed swap amounts
+      (Quantity apples, _) <- getSwapAmounts
+      -- Build transaction sending apples to Bob
+      tx <- buildDummyTransaction bobPk apples
+      applyUpdates Alice (UserInputs "") [SetTransaction Alice tx]
+      ok
+
+-- | Execute Alice's adapter pre-signature creation (Step 2)
+executeAliceCreatePreSignature :: MonadSimulator m => m StepResult
+executeAliceCreatePreSignature = do
+  aliceState <- getPartyState Alice
+  case ( psTransaction aliceState
+       , psPrivateKey aliceState
+       , psPublicKey aliceState
+       , psAdapterCommitment aliceState
+       , psNIZKProof aliceState
+       ) of
+    (SM.Nothing, _, _, _, _) -> failed "Transaction not prepared"
+    (_, SM.Nothing, _, _, _) -> failed "Private key not set"
+    (_, _, SM.Nothing, _, _) -> failed "Public key not set"
+    (_, _, _, SM.Nothing, _) -> failed "Adapter commitment not set"
+    (_, _, _, _, SM.Nothing) -> failed "NIZK proof not set"
+    (SM.Just tx, SM.Just privKey, SM.Just pubKey, SM.Just commitment, SM.Just proof) ->
+      do
+        preSig <- createPreSignature privKey pubKey tx commitment proof
+        applyUpdates Alice (UserInputs "") [SetPreSignature Alice preSig]
+        ok
+
+-- | Execute Alice publishing pre-signature to Bob (Step 3)
+executeAlicePublishPreSignature :: MonadSimulator m => m StepResult
+executeAlicePublishPreSignature = do
+  aliceState <- getPartyState Alice
+  case (psTransaction aliceState, psPreSignature aliceState) of
+    (SM.Nothing, _) -> failed "Transaction not prepared"
+    (_, SM.Nothing) -> failed "Pre-signature not created"
+    (SM.Just tx, SM.Just preSig) -> do
+      -- Bob receives both transaction and pre-signature (cross-participant update)
+      applyUpdates
+        Alice
+        (UserInputs "")
+        [ SetSentPreSignature Alice True
+        , SetOtherPartyTransaction Bob tx
+        , SetOtherPartyPreSignature Bob preSig
+        ]
+      ok

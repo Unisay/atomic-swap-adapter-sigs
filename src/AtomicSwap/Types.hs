@@ -104,7 +104,8 @@ data AdaptedSignature = AdaptedSignature
   { adaptedNonce :: ByteString -- R̂ = R + T
   , adaptedScalar :: ByteString -- ŝ (without t)
   }
-  deriving stock (Show, Eq)
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (NFData, NoThunks)
 
 -- | Adapter secret (scalar y)
 newtype AdapterSecret = AdapterSecret ByteString

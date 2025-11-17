@@ -14,7 +14,12 @@ module AtomicSwap.Simulator.Class
 
 import AtomicSwap.Prelude
 import AtomicSwap.Simulator.State (PartyState)
-import AtomicSwap.Simulator.Types (StateUpdate, UserInputs)
+import AtomicSwap.Simulator.Types
+  ( Asset (..)
+  , Quantity
+  , StateUpdate
+  , UserInputs
+  )
 
 --------------------------------------------------------------------------------
 -- MonadSimulator Class --------------------------------------------------------
@@ -26,6 +31,9 @@ class Monad m => MonadSimulator m where
 
   -- | Get complete party state
   getPartyState :: Participant -> m PartyState
+
+  -- | Get agreed swap amounts
+  getSwapAmounts :: m (Quantity 'Apple, Quantity 'Banana)
 
   -- | Apply state updates through the append-only log
   applyUpdates :: Participant -> UserInputs -> [StateUpdate] -> m ()
@@ -44,3 +52,20 @@ class Monad m => MonadSimulator m where
 
   -- | Verify NIZK proof for adapter commitment
   verifyNIZKProof :: AdapterPoint -> NIZKProof -> m Bool
+
+  -- | Build a dummy transaction for simulator (represents the asset transfer)
+  buildDummyTransaction
+    :: PublicKey
+    -- ^ Recipient's public key
+    -> Natural
+    -- ^ Amount to transfer
+    -> m Transaction
+
+  -- | Create adapter pre-signature for a transaction
+  createPreSignature
+    :: Ed25519PrivateKey
+    -> PublicKey
+    -> Transaction
+    -> AdapterPoint
+    -> NIZKProof
+    -> m AdaptedSignature

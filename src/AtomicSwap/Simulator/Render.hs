@@ -59,13 +59,20 @@ import Data.Strict.Maybe qualified as SM
 import Data.Text.Encoding qualified as TE
 import Prelude
 
+import AtomicSwap.Simulator.Actions
+  ( ActionMetadata (..)
+  , actionMetadata
+  , availableActions
+  , recommendedAction
+  )
 import AtomicSwap.Simulator.State
   ( PartyState (..)
   , SimulatorState (..)
   , getPartyState
   )
 import AtomicSwap.Simulator.Types
-  ( Asset (..)
+  ( Action
+  , Asset (..)
   , GlobalState
   , Participant (..)
   , Quantity (..)
@@ -74,13 +81,16 @@ import AtomicSwap.Simulator.Types
   , StepIndex (..)
   )
 import AtomicSwap.Types
-  ( AdapterPoint (..)
+  ( AdaptedSignature (..)
+  , AdapterPoint (..)
   , AdapterSecret (..)
   , Ed25519PrivateKey (..)
   , NIZKProof (..)
   , PrivateKey (..)
   , PublicKey (..)
+  , Transaction (..)
   )
+import Data.ByteString qualified as BS
 
 --------------------------------------------------------------------------------
 -- Initial Page Template -------------------------------------------------------
@@ -123,7 +133,7 @@ mainPage simState =
                 -- Alice's available actions
                 div_ [id_ "alice-actions", class_ "actions-section"] do
                   h3_ "Actions"
-                  renderAliceActionsFields aliceState
+                  renderAliceActionsFields simState
 
                 div_ [id_ "alice-state", class_ "state-section"] do
                   h3_ "State"
@@ -147,6 +157,7 @@ mainPage simState =
                       "Reset"
                 div_ [id_ "timeline", class_ "timeline"] do
                   renderTimeline (ssSwapAmounts simState) (ssGlobalState simState)
+                  renderNextActionHint simState
 
               -- Right column: Bob's state
               div_ [class_ "column bob-column"] do
@@ -181,6 +192,27 @@ renderTimeline (Quantity apples, Quantity bananas) globalState = do
         )
   -- Then render all other steps
   mapM_ renderTimelineEntry globalState
+
+-- | Render hint for next recommended action
+renderNextActionHint :: SimulatorState -> Html ()
+renderNextActionHint simState =
+  case recommendedAction simState of
+    Nothing ->
+      div_
+        [id_ "next-action-hint", class_ "next-action-hint complete"]
+        "✓ Protocol complete!"
+    Just action ->
+      let metadata = actionMetadata action
+          participantName = case amParticipant metadata of
+            Alice -> "Alice" :: Text
+            Bob -> "Bob"
+       in div_ [id_ "next-action-hint", class_ "next-action-hint"] do
+            span_ [class_ "badge"] "Recommended"
+            toHtml $
+              "Next step: "
+                <> participantName
+                <> " should "
+                <> amButtonText metadata
 
 -- | Render a single timeline entry
 renderTimelineEntry :: StepEntry -> Html ()
@@ -217,6 +249,15 @@ describeUpdates participant updates =
       "Alice shared NIZK proof with Bob"
     [SetNIZKProofVerified Bob _] ->
       "Bob verified Alice's NIZK proof successfully"
+    [SetTransaction Alice _] ->
+      "Alice prepared transaction (apples → Bob)"
+    [SetPreSignature Alice _] ->
+      "Alice created adapter pre-signature"
+    [ SetSentPreSignature Alice _
+      , SetOtherPartyTransaction Bob _
+      , SetOtherPartyPreSignature Bob _
+      ] ->
+        "Alice published transaction and pre-signature to Bob"
     _ -> case participant of
       Alice -> "Alice performed action"
       Bob -> "Bob performed action"
@@ -250,23 +291,27 @@ via HTMX out-of-band swaps. Used after detecting which parties changed.
 -}
 renderStateUpdates :: [Participant] -> SimulatorState -> Html ()
 renderStateUpdates changedParties simState =
-  forM_ changedParties \case
-    Alice -> do
-      let aliceState = getPartyState Alice simState
-      renderAliceStateUpdate aliceState
-      renderAliceActionsUpdate aliceState
-    Bob -> do
-      let bobState = getPartyState Bob simState
-      renderBobStateUpdate bobState
-      renderBobActionsUpdate bobState
+  let aliceState = getPartyState Alice simState
+      bobState = getPartyState Bob simState
+   in forM_ changedParties \case
+        Alice -> do
+          renderAliceStateUpdate aliceState
+          renderAliceActionsUpdate simState
+        Bob -> do
+          renderBobStateUpdate bobState
+          renderBobActionsUpdate bobState
 
 {- | Render new timeline entry from the latest step in GlobalState
 
 Reads the last entry from GlobalState to create timeline event.
+Also updates hint by deleting old and appending new.
 -}
 renderNewTimelineEntry :: SimulatorState -> Html ()
-renderNewTimelineEntry simState =
+renderNewTimelineEntry simState = do
   for_ (viaNonEmpty last (ssGlobalState simState)) renderTimelineEntry
+  -- Delete old hint, then append new one
+  div_ [hxSwapOob_ "delete:#next-action-hint"] mempty
+  renderNextActionHint simState
 
 --------------------------------------------------------------------------------
 -- State Rendering -------------------------------------------------------------
@@ -280,13 +325,11 @@ renderAliceStateFields partyState = do
       div_ [class_ "state-item state-set"] do
         span_ [class_ "state-label"] "Private Key (sk0)"
         span_ [class_ "state-value", title_ (formatHex sk0)] $
-          toHtml $
-            formatHex sk0
+          toHtml (formatHex sk0)
       div_ [class_ "state-item state-set"] do
         span_ [class_ "state-label"] "Private Key (sk1)"
         span_ [class_ "state-value", title_ (formatHex sk1)] $
-          toHtml $
-            formatHex sk1
+          toHtml (formatHex sk1)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Private Key (sk0)"
@@ -300,8 +343,7 @@ renderAliceStateFields partyState = do
       div_ [class_ "state-item state-set"] do
         span_ [class_ "state-label"] "Public Key"
         span_ [class_ "state-value", title_ (formatHex pkBytes)] $
-          toHtml $
-            formatHex pkBytes
+          toHtml (formatHex pkBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Public Key"
@@ -312,8 +354,7 @@ renderAliceStateFields partyState = do
       div_ [class_ "state-item state-set"] do
         span_ [class_ "state-label"] "Bob's Public Key"
         span_ [class_ "state-value", title_ (formatHex pkBytes)] $
-          toHtml $
-            formatHex pkBytes
+          toHtml (formatHex pkBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Bob's Public Key"
@@ -324,8 +365,7 @@ renderAliceStateFields partyState = do
       div_ [class_ "state-item state-set"] do
         span_ [class_ "state-label"] "Adapter Secret (y)"
         span_ [class_ "state-value", title_ (formatHex secretBytes)] $
-          toHtml $
-            formatHex secretBytes
+          toHtml (formatHex secretBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Adapter Secret (y)"
@@ -336,8 +376,7 @@ renderAliceStateFields partyState = do
       div_ [class_ "state-item state-set"] do
         span_ [class_ "state-label"] "Seal (Y)"
         span_ [class_ "state-value", title_ (formatHex commitBytes)] $
-          toHtml $
-            formatHex commitBytes
+          toHtml (formatHex commitBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Seal (Y)"
@@ -348,11 +387,40 @@ renderAliceStateFields partyState = do
       div_ [class_ "state-item state-set"] do
         span_ [class_ "state-label"] "NIZK Proof"
         span_ [class_ "state-value", title_ (formatHex proofBytes)] $
-          toHtml $
-            formatHex proofBytes
+          toHtml (formatHex proofBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "NIZK Proof"
+        span_ [class_ "state-value"] "[not set]"
+  -- Transaction
+  case SM.maybe Nothing Just (psTransaction partyState) of
+    Just tx -> do
+      div_ [class_ "state-item state-set"] do
+        span_ [class_ "state-label"] "Transaction"
+        span_ [class_ "state-value"] $
+          toHtml
+            ( show (length (txInputs tx))
+                <> " inputs, "
+                <> show (length (txOutputs tx))
+                <> " outputs"
+                :: Text
+            )
+    Nothing -> do
+      div_ [class_ "state-item state-unset"] do
+        span_ [class_ "state-label"] "Transaction"
+        span_ [class_ "state-value"] "[not set]"
+  -- Pre-Signature
+  case SM.maybe Nothing Just (psPreSignature partyState) of
+    Just (AdaptedSignature rSign sigTilde) -> do
+      div_ [class_ "state-item state-set"] do
+        span_ [class_ "state-label"] "Pre-Signature (σ̃)"
+        span_
+          [class_ "state-value", title_ (formatHex rSign <> " || " <> formatHex sigTilde)]
+          $ toHtml
+          $ formatHex (BS.take 16 rSign) <> "..." <> formatHex (BS.take 8 sigTilde)
+    Nothing -> do
+      div_ [class_ "state-item state-unset"] do
+        span_ [class_ "state-label"] "Pre-Signature (σ̃)"
         span_ [class_ "state-value"] "[not set]"
 
 -- | Render Alice's complete state (with OOB wrapper)
@@ -441,6 +509,36 @@ renderBobStateFields partyState = do
     else div_ [class_ "state-item state-unset"] do
       span_ [class_ "state-label"] "NIZK Proof Status"
       span_ [class_ "state-value"] "[not verified]"
+  -- Alice's Transaction (received from Alice)
+  case SM.maybe Nothing Just (psOtherPartyTransaction partyState) of
+    Just tx -> do
+      div_ [class_ "state-item state-set"] do
+        span_ [class_ "state-label"] "Alice's Transaction"
+        span_ [class_ "state-value"] $
+          toHtml
+            ( show (length (txInputs tx))
+                <> " inputs, "
+                <> show (length (txOutputs tx))
+                <> " outputs"
+                :: Text
+            )
+    Nothing -> do
+      div_ [class_ "state-item state-unset"] do
+        span_ [class_ "state-label"] "Alice's Transaction"
+        span_ [class_ "state-value"] "[not set]"
+  -- Alice's Pre-Signature (received from Alice)
+  case SM.maybe Nothing Just (psOtherPartyPreSignature partyState) of
+    Just (AdaptedSignature rSign sigTilde) -> do
+      div_ [class_ "state-item state-set"] do
+        span_ [class_ "state-label"] "Alice's Pre-Sig (σ̃ᴬ)"
+        span_
+          [class_ "state-value", title_ (formatHex rSign <> " || " <> formatHex sigTilde)]
+          $ toHtml
+          $ formatHex (BS.take 16 rSign) <> "..." <> formatHex (BS.take 8 sigTilde)
+    Nothing -> do
+      div_ [class_ "state-item state-unset"] do
+        span_ [class_ "state-label"] "Alice's Pre-Sig (σ̃ᴬ)"
+        span_ [class_ "state-value"] "[not set]"
   -- Extracted Secret (Bob only)
   div_ [class_ "state-item state-unset"] do
     span_ [class_ "state-label"] "Extracted Secret"
@@ -457,97 +555,38 @@ renderBobStateUpdate partyState = do
 -- Action Rendering ------------------------------------------------------------
 
 -- | Render Alice's action buttons (no OOB wrapper)
-renderAliceActionsFields :: PartyState -> Html ()
-renderAliceActionsFields partyState = do
-  let hasPublicKey = SM.isJust (psPublicKey partyState)
-      sentPublicKey = psSentPublicKey partyState
-      hasSecret = SM.isJust (psAdapterSecret partyState)
-      hasCommitment = SM.isJust (psAdapterCommitment partyState)
-      sentCommitment = psSentCommitment partyState
-      hasNIZKProof = SM.isJust (psNIZKProof partyState)
-      sentNIZKProof = psSentNIZKProof partyState
-      hasAnyActions =
-        not hasPublicKey
-          || (hasPublicKey && not sentPublicKey)
-          || not hasSecret
-          || (hasSecret && not hasCommitment)
-          || (hasCommitment && not sentCommitment)
-          || (sentCommitment && not hasNIZKProof)
-          || (hasNIZKProof && not sentNIZKProof)
+renderAliceActionsFields :: SimulatorState -> Html ()
+renderAliceActionsFields simState =
+  let aliceActions = filter isAliceAction (availableActions simState)
+      hasActions = not (null aliceActions)
+   in if hasActions
+        then
+          div_ [class_ "button-group"] $
+            mapM_ renderActionButton aliceActions
+        else div_ [class_ "no-actions"] "Waiting for Bob..."
+  where
+    isAliceAction :: Action -> Bool
+    isAliceAction action =
+      let metadata = actionMetadata action
+       in amParticipant metadata == Alice
 
-  if not hasAnyActions
-    then div_ [class_ "no-actions"] "Waiting for Bob..."
-    else div_ [class_ "button-group"] do
-      -- Show keypair button ONLY if not generated
-      unless hasPublicKey $
-        button_
-          [ class_ "party-button alice-button"
-          , hxPost_ "/step/alice-keygen"
-          , hxTarget_ "#timeline"
-          , hxSwap_ "beforeend"
-          ]
-          "Generate Keys"
-      -- Show send public key button if has key but hasn't sent it yet
-      when (hasPublicKey && not sentPublicKey) $
-        button_
-          [ class_ "party-button alice-button"
-          , hxPost_ "/step/alice-send-public-key"
-          , hxTarget_ "#timeline"
-          , hxSwap_ "beforeend"
-          ]
-          "Publish Pubkey"
-      -- Show secret button ONLY if not generated
-      unless hasSecret $
-        button_
-          [ class_ "party-button alice-button"
-          , hxPost_ "/step/alice-generate-secret"
-          , hxTarget_ "#timeline"
-          , hxSwap_ "beforeend"
-          ]
-          "Generate Secret"
-      -- Show commitment button ONLY if has secret but no commitment
-      when (hasSecret && not hasCommitment) $
-        button_
-          [ class_ "party-button alice-button"
-          , hxPost_ "/step/alice-make-commitment"
-          , hxTarget_ "#timeline"
-          , hxSwap_ "beforeend"
-          ]
-          "Seal Secret"
-      -- Show send commitment button if has commitment but hasn't sent it yet
-      when (hasCommitment && not sentCommitment) $
-        button_
-          [ class_ "party-button alice-button"
-          , hxPost_ "/step/alice-send-commitment"
-          , hxTarget_ "#timeline"
-          , hxSwap_ "beforeend"
-          ]
-          "Publish Seal"
-      -- Show NIZK proof generation button ONLY if has sent commitment but no proof
-      when (sentCommitment && not hasNIZKProof) $
-        button_
-          [ class_ "party-button alice-button"
-          , hxPost_ "/step/alice-generate-nizk-proof"
-          , hxTarget_ "#timeline"
-          , hxSwap_ "beforeend"
-          ]
-          "Prove Seal"
-      -- Show send NIZK proof button if has proof but hasn't sent it yet
-      when (hasNIZKProof && not sentNIZKProof) $
-        button_
-          [ class_ "party-button alice-button"
-          , hxPost_ "/step/alice-send-nizk-proof"
-          , hxTarget_ "#timeline"
-          , hxSwap_ "beforeend"
-          ]
-          "Publish Proof"
+    renderActionButton :: Action -> Html ()
+    renderActionButton action =
+      let metadata = actionMetadata action
+       in button_
+            [ class_ "party-button alice-button"
+            , hxPost_ (amEndpoint metadata)
+            , hxTarget_ "#timeline"
+            , hxSwap_ "beforeend"
+            ]
+            (toHtml $ amButtonText metadata)
 
 -- | Render Alice's actions with OOB wrapper
-renderAliceActionsUpdate :: PartyState -> Html ()
-renderAliceActionsUpdate partyState = do
+renderAliceActionsUpdate :: SimulatorState -> Html ()
+renderAliceActionsUpdate simState =
   div_ [hxSwapOob_ "innerHTML:#alice-actions"] do
     h3_ "Actions"
-    renderAliceActionsFields partyState
+    renderAliceActionsFields simState
 
 -- | Render Bob's action buttons (no OOB wrapper)
 renderBobActionsFields :: PartyState -> Html ()

@@ -6,7 +6,8 @@
 
 module AtomicSwap.Simulator.Types
   ( -- * Core Types
-    Participant (..)
+    Action (..)
+  , Participant (..)
   , Asset (..)
   , Quantity (..)
   , Chain (..)
@@ -30,6 +31,24 @@ import NoThunks.Class (NoThunks (..))
 
 --------------------------------------------------------------------------------
 -- Core Enums ------------------------------------------------------------------
+
+-- | User-facing actions in the simulator
+data Action
+  = AliceKeygen
+  | BobKeygen
+  | AliceSendPublicKey
+  | BobSendPublicKey
+  | AliceGenerateSecret
+  | AliceMakeCommitment
+  | AliceSendCommitment
+  | AliceGenerateNIZKProof
+  | AliceSendNIZKProof
+  | BobVerifyNIZKProof
+  | AlicePrepareTransaction
+  | AliceCreatePreSignature
+  | AlicePublishPreSignature
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (NFData, NoThunks)
 
 -- | Asset types (type-level)
 data Asset = Apple | Banana
@@ -112,8 +131,11 @@ data StateUpdate
   | SetSentNIZKProof Participant Bool
   | SetOtherPartyNIZKProof Participant NIZKProof
   | SetNIZKProofVerified Participant Bool
-  | SetPreSignature Participant Signature
-  | SetPreSignatureNonce Participant ByteString
+  | SetTransaction Participant Transaction
+  | SetPreSignature Participant AdaptedSignature
+  | SetSentPreSignature Participant Bool
+  | SetOtherPartyTransaction Participant Transaction
+  | SetOtherPartyPreSignature Participant AdaptedSignature
   | -- Blockchain state
     PostTransaction SomeChain TxId Transaction
   | ObserveTransaction Participant SomeChain TxId

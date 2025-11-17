@@ -68,7 +68,11 @@ data PartyState = PartyState
   , psSentNIZKProof :: Bool
   , psOtherPartyNIZKProof :: SM.Maybe NIZKProof
   , psNIZKProofVerified :: Bool
-  , psPreSignature :: SM.Maybe Signature
+  , psTransaction :: SM.Maybe Transaction
+  , psPreSignature :: SM.Maybe AdaptedSignature
+  , psSentPreSignature :: Bool
+  , psOtherPartyTransaction :: SM.Maybe Transaction
+  , psOtherPartyPreSignature :: SM.Maybe AdaptedSignature
   , psObservedTxs :: Seq.Seq TxId
   , psIsWaiting :: Bool
   }
@@ -93,7 +97,11 @@ emptyPartyState =
       , psSentNIZKProof = False
       , psOtherPartyNIZKProof = SM.Nothing
       , psNIZKProofVerified = False
+      , psTransaction = SM.Nothing
       , psPreSignature = SM.Nothing
+      , psSentPreSignature = False
+      , psOtherPartyTransaction = SM.Nothing
+      , psOtherPartyPreSignature = SM.Nothing
       , psObservedTxs = Seq.empty
       , psIsWaiting = False
       }
@@ -204,9 +212,21 @@ applyUpdate party update partyState = case update of
   SetNIZKProofVerified p verified
     | p == party ->
         partyState {psNIZKProofVerified = verified}
+  SetTransaction p tx
+    | p == party ->
+        partyState {psTransaction = SM.Just tx}
   SetPreSignature p sig
     | p == party ->
         partyState {psPreSignature = SM.Just sig}
+  SetSentPreSignature p sent
+    | p == party ->
+        partyState {psSentPreSignature = sent}
+  SetOtherPartyTransaction p tx
+    | p == party ->
+        partyState {psOtherPartyTransaction = SM.Just tx}
+  SetOtherPartyPreSignature p sig
+    | p == party ->
+        partyState {psOtherPartyPreSignature = SM.Just sig}
   SetThreadWaiting p waiting
     | p == party ->
         partyState {psIsWaiting = waiting}
