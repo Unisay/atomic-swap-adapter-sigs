@@ -80,6 +80,35 @@ hlint src/ test/
 
 **Note**: Test output format (`--test-show-details=streaming`) is configured in `cabal.project`.
 
+## Development Workflow (Simulator)
+
+### Auto-rebuild with watchman-make (Recommended for Claude Code)
+
+Run simulator with automatic rebuild/restart on file changes:
+
+```bash
+# Start watchman-make in background (Claude Code can use this)
+watchman-make \
+  -p 'src/**/*.hs' 'app/**/*.hs' '*.cabal' \
+  --run 'pkill -9 -x atomic-swap-simulator; cabal build --ghc-options=-Werror && nohup cabal run atomic-swap-simulator > /tmp/simulator.log 2>&1 &' &
+
+# Check server logs
+tail -f /tmp/simulator.log
+
+# Stop watchman and server
+pkill -9 -f watchman; pkill -9 -x atomic-swap-simulator
+```
+
+**Behavior**:
+
+- Watches `src/**/*.hs`, `app/**/*.hs`, `*.cabal`
+- On file change: kills old server, rebuilds, restarts server
+- Server runs on http://localhost:8888
+- Logs to `/tmp/simulator.log`
+- If build fails, server is NOT restarted (old version keeps running)
+
+**For Claude Code**: Use the watchman-make command as a background process. It will automatically restart the server after every code change.
+
 ## Code Architecture
 
 ### Module Organization
@@ -182,6 +211,9 @@ test/AtomicSwap/
 ### Modern Haskell Extensions
 
 - **BlockArguments**: Required (`it "test" do` not `it "test" $ do`)
+  - **Style preference**: Never use `$` before lambda as last argument
+  - Use `foo \x -> ...` instead of `foo $ \x -> ...`
+  - Use `bar \case` instead of `bar $ \case`
 - **DerivingVia**: For consistent Show instances (see HexBytes pattern)
 - **ImportQualifiedPost**: Required (`import Data.Map qualified as Map`)
 
