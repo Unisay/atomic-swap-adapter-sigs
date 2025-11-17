@@ -247,6 +247,31 @@ See `src/AtomicSwap/Simulator/State.hs:10-19` for detailed architecture document
 - **DerivingVia**: For consistent Show instances (see HexBytes pattern)
 - **ImportQualifiedPost**: Required (`import Data.Map qualified as Map`)
 
+### Type Safety Principles
+
+**Type-Indexed Newtypes Over Primitives:**
+
+- Prefer: `Quantity 'Apple` over `Natural` over `Int`
+- Pattern: `newtype Quantity (asset :: Asset) = Quantity Natural`
+- Prevents mixing incompatible values (apples vs bananas)
+- Provides type-level guarantees and better compiler errors
+
+**When designing types:**
+
+1. Start with most specific type possible
+2. Use GADTs/DataKinds for type-level constraints
+3. Avoid primitive types (Int, Text, ByteString) for domain values
+4. Derive common instances (Eq, Ord, Show, NFData, NoThunks)
+
+### CSS and Styling
+
+**CSS-First Principle**: Always define styles in `static/style.css`, never use inline styles in Lucid HTML.
+
+- Add CSS classes to stylesheet
+- Reference classes in HTML: `div_ [class_ "my-class"]`
+- Only use inline styles if absolutely necessary (e.g., dynamic computed values)
+- Rationale: Maintainability, consistency, separation of concerns
+
 ### Zero-Warning Standard
 
 **MANDATORY**: All code must compile with zero warnings.

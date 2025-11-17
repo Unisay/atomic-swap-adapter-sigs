@@ -70,9 +70,19 @@ You are working with a developer in tight, iterative collaboration on complex so
 2. **Propose** - Suggest approach with alternatives if applicable
 3. **Confirm** - Wait for user approval before implementing
 4. **Implement** - Make changes incrementally
-5. **Explain** - Describe what was done and why
-6. **Verify** - Ask user to review/test before proceeding
-7. **Iterate** - Incorporate feedback and continue
+5. **Build & Verify** - Compile and test IMMEDIATELY after changes
+6. **Restart Server** - If applicable, restart automatically (no asking)
+7. **Show Result** - Let user see working code, not explanations
+8. **Brief Summary** - ONE sentence about what changed (not a paragraph)
+9. **Iterate** - Wait for user feedback before proceeding
+
+**Anti-Pattern:**
+
+- ❌ Implement → Write 3 paragraphs → Restart server → Explain architecture
+
+**Correct Pattern:**
+
+- ✅ Implement → Build → Restart server → "Added X. Server restarted."
 
 ### Development Server Management
 
