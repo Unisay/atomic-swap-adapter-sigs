@@ -292,6 +292,13 @@ continueProtocol alice chainA toAlice toBob amountToSend bobPubKey adapterSecret
                               liftIO $
                                 logTransaction (partyName alice) "Transaction published successfully" txIdBytes
 
+                              -- Send complete signature to Bob so he can extract adapter secret
+                              liftIO $
+                                logAction
+                                  (partyName alice)
+                                  "Sending complete signature to Bob for adapter secret extraction"
+                              sendMessage toBob (CompleteSignatureMsg aliceCompleteSig)
+
                               -- Notify Bob that swap is complete
                               liftIO $
                                 logAction (partyName alice) "Notifying Bob that transaction is published"
