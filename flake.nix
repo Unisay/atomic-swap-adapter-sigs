@@ -105,12 +105,18 @@
               nodePackages.prettier # Markdown
               nixfmt-rfc-style
 
+              # Development workflow
+              watchman # File watching for auto-rebuild
+
               # Essential utilities
               jq
 
               # Cryptographic libraries
               libsodium
               pkg-config
+
+              # System libraries
+              zlib
             ]
             ++ pre-commit-check.enabledPackages;
 
@@ -122,9 +128,13 @@
             echo "Commands:"
             echo "  cabal build                     # Build the library"
             echo "  cabal test                      # Run tests"
+            echo "  cabal run atomic-swap-simulator # Run simulator server"
             echo "  pre-commit run --all-files      # Run all pre-commit hooks"
             echo "  treefmt                         # Format all code"
             echo "  hlint src/ test/                # Lint code"
+            echo ""
+            echo "Development workflow:"
+            echo "  See CLAUDE.md for watchman-make auto-rebuild commands"
             echo ""
           '';
         };

@@ -22,13 +22,24 @@ common common-deps
     , bytestring
     , containers
     , cryptonite
+    , deepseq
     , directory
+    , foldl
+    , http-types
     , io-classes
     , io-sim
+    , lucid2             ^>=0.0.20221012
     , memory
+    , mtl
+    , nothunks           ^>=0.2
     , relude             ^>=1.2.2
     , stm
+    , strict             ^>=0.5
+    , strict-containers  ^>=0.2
     , text
+    , wai                ^>=3.2
+    , wai-app-static     ^>=3.1
+    , warp               ^>=3.3
 
 common common-language
   import:             common-deps
@@ -76,10 +87,25 @@ library
     AtomicSwap.Protocol.Alice
     AtomicSwap.Protocol.Bob
     AtomicSwap.Protocol.Messaging
+    AtomicSwap.Simulator.Class
+    AtomicSwap.Simulator.Render
+    AtomicSwap.Simulator.Run
+    AtomicSwap.Simulator.State
+    AtomicSwap.Simulator.Steps
+    AtomicSwap.Simulator.Types
+    AtomicSwap.Simulator.Types.Orphans
     AtomicSwap.Types
     AtomicSwap.Types.Orphans
+    Data.IORef.Strict
 
   hs-source-dirs:  src
+
+executable atomic-swap-simulator
+  import:         common-language
+  main-is:        Main.hs
+  hs-source-dirs: app
+  ghc-options:    -threaded -rtsopts -with-rtsopts=-N
+  build-depends:  atomic-swap-adapter-sigs
 
 test-suite atomic-swap-tests
   import:             common-language
