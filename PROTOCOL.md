@@ -4,13 +4,22 @@
 
 This document describes the adapter signature-based atomic swap protocol implemented in this tutorial. The protocol enables trustless, atomic exchange of digital assets across two independent blockchains without requiring hash-timelocked contracts (HTLCs) or on-chain scripting.
 
+### Notation
+
+This document uses **Unicode mathematical notation** throughout for maximum compatibility:
+
+- **Subscripts**: sk₀ᴬ, sk₁ᴮ (instead of sk_0^A, sk_1^B)
+- **Superscripts**: pkᴬ, Txᴮ (instead of pk_A, Tx_B)
+- **Tildes**: σ̃ᴬ, sig̃ᴮ for pre-signatures
+- **Greek letters**: π (pi), σ (sigma), directly as Unicode
+- **Mathematical symbols**: ∈ (element of), ℤ (integers), · (dot product), ‖ (concatenation)
+
+This approach ensures the notation renders correctly in all contexts (GitHub, Mermaid diagrams, documentation tools) without requiring LaTeX/MathJax support.
+
 ## Protocol Flow Diagram
 
 ```mermaid
----
-config:
-  theme: dark
----
+%%{init: {'theme':'dark', 'themeVariables': {'fontSize':'24px'}}}%%
 sequenceDiagram
     autonumber
 
@@ -27,20 +36,20 @@ sequenceDiagram
     Note over Alice,ChainB: Phase 1: Setup and Key Exchange
 
     par Key Generation
-        Alice->>+Alice: Generate keypair<br/>(sk0_A, sk1_A, pk_A)
+        Alice->>+Alice: Generate keypair<br/>(sk₀ᴬ, sk₁ᴬ, pkᴬ)
         Alice->>-Alice: Ready
     and
-        Bob->>+Bob: Generate keypair<br/>(sk0_B, sk1_B, pk_B)
+        Bob->>+Bob: Generate keypair<br/>(sk₀ᴮ, sk₁ᴮ, pkᴮ)
         Bob->>-Bob: Ready
     end
 
-    Alice->>Bob: Send pk_A
-    Bob->>Alice: Send pk_B
+    Alice->>Bob: Send pkᴬ
+    Bob->>Alice: Send pkᴮ
 
     Note over Alice,Bob: Agree on swap terms:<br/>Alice: 10 ChainA tokens<br/>Bob: 5 ChainB tokens
 
-    Alice->>+Alice: Generate adapter secret y ∈ ℤ_q*
-    Alice->>Alice: Compute adapter point Y = y · B
+    Alice->>+Alice: Generate adapter secret y ∈ ℤ*_q
+    Alice->>Alice: Compute adapter point Y = y·B
     Alice->>-Alice: Generate NIZK proof π = Prove_zk(Y, y)
 
     Alice->>Bob: Send (Y, π)
@@ -53,16 +62,16 @@ sequenceDiagram
     Alice->>+ChainA: Query UTXO
     ChainA-->>-Alice: UTXO confirmed (10 tokens)
 
-    Alice->>+Alice: Build Tx_A: 10 tokens → pk_B
-    Alice->>Alice: Create adapted pre-signature σ_tilde_A:<br/>• r_A = H2(sk1_A ‖ Tx_A ‖ k_A)<br/>• R_sign_A = r_A·B + Y<br/>• sig_tilde_A = r_A + h_A·sk0_A
+    Alice->>+Alice: Build Txᴬ sending 10 tokens to pkᴮ
+    Alice->>Alice: Create adapted pre-signature σ̃ᴬ:<br/>• rᴬ = H₂(sk₁ᴬ ‖ Txᴬ ‖ kᴬ)<br/>• R_signᴬ = rᴬ·B + Y<br/>• sig̃ᴬ = rᴬ + hᴬ·sk₀ᴬ
     Alice->>-Alice: Pre-signature ready
 
-    Alice->>Bob: Send (Tx_A, σ_tilde_A)
+    Alice->>Bob: Send (Txᴬ, σ̃ᴬ)
 
     critical Bob verifies Alice's pre-signature
-        Bob->>+Bob: Compute R'_A = R_sign_A - Y
-        Bob->>Bob: Compute h_A = H2(R_sign_A ‖ pk_A ‖ Tx_A)
-        Bob->>-Bob: Verify: sig_tilde_A·B = R'_A + h_A·pk_A ✓
+        Bob->>+Bob: Compute R'ᴬ = R_signᴬ - Y
+        Bob->>Bob: Compute hᴬ = H₂(R_signᴬ ‖ pkᴬ ‖ Txᴬ)
+        Bob->>-Bob: Verify: sig̃ᴬ·B = R'ᴬ + hᴬ·pkᴬ ✓
     option Verification fails
         Bob->>Alice: Abort protocol
     end
@@ -70,18 +79,18 @@ sequenceDiagram
     Bob->>+ChainB: Query UTXO
     ChainB-->>-Bob: UTXO confirmed (5 tokens)
 
-    Bob->>+Bob: Build Tx_B: 5 tokens → pk_A
-    Bob->>Bob: Create adapted pre-signature σ_tilde_B:<br/>• r_B = H2(sk1_B ‖ Tx_B ‖ k_B)<br/>• R_sign_B = r_B·B + Y (same Y!)<br/>• sig_tilde_B = r_B + h_B·sk0_B
+    Bob->>+Bob: Build Txᴮ sending 5 tokens to pkᴬ
+    Bob->>Bob: Create adapted pre-signature σ̃ᴮ:<br/>• rᴮ = H₂(sk₁ᴮ ‖ Txᴮ ‖ kᴮ)<br/>• R_signᴮ = rᴮ·B + Y (same Y!)<br/>• sig̃ᴮ = rᴮ + hᴮ·sk₀ᴮ
     Bob->>-Bob: Pre-signature ready
 
-    Bob->>Alice: Send (Tx_B, σ_tilde_B)
+    Bob->>Alice: Send (Txᴮ, σ̃ᴮ)
 
     Note over Alice,ChainB: Phase 3: Pre-Signature Verification
 
     critical Alice verifies Bob's pre-signature
-        Alice->>+Alice: Compute R'_B = R_sign_B - Y
-        Alice->>Alice: Compute h_B = H2(R_sign_B ‖ pk_B ‖ Tx_B)
-        Alice->>-Alice: Verify: sig_tilde_B·B = R'_B + h_B·pk_B ✓
+        Alice->>+Alice: Compute R'ᴮ = R_signᴮ - Y
+        Alice->>Alice: Compute hᴮ = H₂(R_signᴮ ‖ pkᴮ ‖ Txᴮ)
+        Alice->>-Alice: Verify: sig̃ᴮ·B = R'ᴮ + hᴮ·pkᴮ ✓
     option Verification fails
         Alice->>Bob: Abort protocol
     end
@@ -90,26 +99,26 @@ sequenceDiagram
 
     Note over Alice,ChainB: Phase 4: Atomic Execution
 
-    Alice->>+Alice: Complete signature: sig_A = sig_tilde_A + y
-    Alice->>-ChainA: Publish Tx_A with σ_A = (R_sign_A, sig_A)
+    Alice->>+Alice: Complete signature: sigᴬ = sig̃ᴬ + y
+    Alice->>-ChainA: Publish Txᴬ with σᴬ = (R_signᴬ, sigᴬ)
 
     activate ChainA
-    ChainA->>ChainA: Verify: sig_A·B = R_sign_A + h_A·pk_A ✓
+    ChainA->>ChainA: Verify: sigᴬ·B = R_signᴬ + hᴬ·pkᴬ ✓
     ChainA-->>Alice: ✓ Transaction confirmed<br/>Alice receives 5 tokens
     deactivate ChainA
 
-    Bob->>ChainA: Observe published Tx_A
+    Bob->>ChainA: Observe Txᴬ published
 
     critical Bob extracts adapter secret
-        Bob->>+Bob: Extract: y = sig_A - sig_tilde_A
+        Bob->>+Bob: Extract: y = sigᴬ - sig̃ᴬ
         Bob->>-Bob: Verify: Y = y·B ✓
     end
 
-    Bob->>+Bob: Complete signature: sig_B = sig_tilde_B + y
-    Bob->>-ChainB: Publish Tx_B with σ_B = (R_sign_B, sig_B)
+    Bob->>+Bob: Complete signature: sigᴮ = sig̃ᴮ + y
+    Bob->>-ChainB: Publish Txᴮ with σᴮ = (R_signᴮ, sigᴮ)
 
     activate ChainB
-    ChainB->>ChainB: Verify: sig_B·B = R_sign_B + h_B·pk_B ✓
+    ChainB->>ChainB: Verify: sigᴮ·B = R_signᴮ + hᴮ·pkᴮ ✓
     ChainB-->>Bob: ✓ Transaction confirmed<br/>Bob receives 10 tokens
     deactivate ChainB
 
@@ -137,10 +146,10 @@ Based on comprehensive research (see `research/2025-11-14-ed25519-adapter-signat
 An adapter signature is a pre-signature that:
 
 1. Can be verified as "almost valid"
-2. Requires a secret value `t` to complete
-3. Reveals `t` when completed and published
+2. Requires a secret value y to complete
+3. Reveals y when completed and published
 
-**Key Property**: If Alice can complete her signature only by learning Bob's secret `t`, and Bob reveals `t` by publishing his transaction, then Alice can atomically complete her transaction.
+**Key Property**: If Alice can complete her signature only by learning the adapter secret y, and publishing her transaction reveals y, then Bob can extract y and atomically complete his transaction.
 
 ## Protocol Phases (V1 - Simplified)
 
@@ -150,12 +159,12 @@ An adapter signature is a pre-signature that:
 
 ```
 1. Alice generates rEdDSA keypair:
-   - Private: (sk0_A, sk1_A)
-   - Public: pk_A = sk0_A · B
+   - Private: (sk₀ᴬ, sk₁ᴬ)
+   - Public: pkᴬ = sk₀ᴬ · B
 
 2. Bob generates rEdDSA keypair:
-   - Private: (sk0_B, sk1_B)
-   - Public: pk_B = sk0_B · B
+   - Private: (sk₀ᴮ, sk₁ᴮ)
+   - Public: pkᴮ = sk₀ᴮ · B
 
 3. Alice and Bob exchange public keys via TMVar
 
@@ -163,7 +172,7 @@ An adapter signature is a pre-signature that:
    - Alice offers: 10 ChainA tokens
    - Bob offers: 5 ChainB tokens
 
-5. Alice generates adapter secret: y ∈ ℤ_q* (random scalar)
+5. Alice generates adapter secret: y ∈ ℤ*_q (random scalar)
 
 6. Alice computes adapter point: Y = y · B
 
@@ -182,62 +191,62 @@ An adapter signature is a pre-signature that:
 ```
 10. Alice queries her UTXO on ChainA (has 10 tokens)
 
-11. Alice builds transaction Tx_A:
+11. Alice builds transaction Txᴬ:
     Inputs:  Alice's UTXO (10 tokens)
-    Outputs: 10 tokens to Bob's public key pk_B
+    Outputs: 10 tokens to Bob's public key pkᴮ
 
-12. Alice creates adapted pre-signature for Tx_A:
-    a. Select random k_A ∈ ℤ_q*
-    b. Compute r_A = H2(sk1_A || Tx_A || k_A) mod q
-    c. Compute R_pre_A = r_A · B
-    d. Compute adapted nonce: R_sign_A = R_pre_A + Y  ← KEY: Add adapter point!
-    e. Compute challenge: h_A = H2(R_sign_A || pk_A || Tx_A)
-    f. Compute pre-signature scalar: sig_tilde_A = r_A + h_A · sk0_A mod q
+12. Alice creates adapted pre-signature for Txᴬ:
+    a. Select random kᴬ ∈ ℤ*_q
+    b. Compute rᴬ = H₂(sk₁ᴬ ‖ Txᴬ ‖ kᴬ) mod q
+    c. Compute R_preᴬ = rᴬ · B
+    d. Compute adapted nonce: R_signᴬ = R_preᴬ + Y  ← KEY: Add adapter point!
+    e. Compute challenge: hᴬ = H₂(R_signᴬ ‖ pkᴬ ‖ Txᴬ)
+    f. Compute pre-signature scalar: sig̃ᴬ = rᴬ + hᴬ · sk₀ᴬ mod q
        Note: Does NOT include y!
-    g. Output: σ_tilde_A = (sig_tilde_A, R_sign_A, π)
+    g. Output: σ̃ᴬ = (sig̃ᴬ, R_signᴬ, π)
 
-13. Alice sends (Tx_A, σ_tilde_A) to Bob via TMVar
+13. Alice sends (Txᴬ, σ̃ᴬ) to Bob via TMVar
 ```
 
 **Bob creates adapted pre-signature**:
 
 ```
 14. Bob receives and verifies Alice's adapted pre-signature:
-    a. Parse σ_tilde_A = (sig_tilde_A, R_sign_A, π)
-    b. Compute R'_A = R_sign_A - Y  ← Remove adapter point
-    c. Compute h_A = H2(R_sign_A || pk_A || Tx_A)
-    d. Verify: sig_tilde_A · B = R'_A + h_A · pk_A
+    a. Parse σ̃ᴬ = (sig̃ᴬ, R_signᴬ, π)
+    b. Compute R'ᴬ = R_signᴬ - Y  ← Remove adapter point
+    c. Compute hᴬ = H₂(R_signᴬ ‖ pkᴬ ‖ Txᴬ)
+    d. Verify: sig̃ᴬ · B = R'ᴬ + hᴬ · pkᴬ
     e. Verify: Verify_zk(Y, π) = 1
     f. If valid, continue; else abort
 
 15. Bob queries his UTXO on ChainB (has 5 tokens)
 
-16. Bob builds transaction Tx_B:
+16. Bob builds transaction Txᴮ:
     Inputs:  Bob's UTXO (5 tokens)
-    Outputs: 5 tokens to Alice's public key pk_A
+    Outputs: 5 tokens to Alice's public key pkᴬ
 
-17. Bob creates adapted pre-signature for Tx_B using Alice's Y:
-    a. Select random k_B ∈ ℤ_q*
-    b. Compute r_B = H2(sk1_B || Tx_B || k_B) mod q
-    c. Compute R_pre_B = r_B · B
-    d. Compute adapted nonce: R_sign_B = R_pre_B + Y  ← Same Y from Alice!
-    e. Compute challenge: h_B = H2(R_sign_B || pk_B || Tx_B)
-    f. Compute pre-signature scalar: sig_tilde_B = r_B + h_B · sk0_B mod q
-    g. Output: σ_tilde_B = (sig_tilde_B, R_sign_B, π)
+17. Bob creates adapted pre-signature for Txᴮ using Alice's Y:
+    a. Select random kᴮ ∈ ℤ*_q
+    b. Compute rᴮ = H₂(sk₁ᴮ ‖ Txᴮ ‖ kᴮ) mod q
+    c. Compute R_preᴮ = rᴮ · B
+    d. Compute adapted nonce: R_signᴮ = R_preᴮ + Y  ← Same Y from Alice!
+    e. Compute challenge: hᴮ = H₂(R_signᴮ ‖ pkᴮ ‖ Txᴮ)
+    f. Compute pre-signature scalar: sig̃ᴮ = rᴮ + hᴮ · sk₀ᴮ mod q
+    g. Output: σ̃ᴮ = (sig̃ᴮ, R_signᴮ, π)
 
-18. Bob sends (Tx_B, σ_tilde_B) to Alice via TMVar
+18. Bob sends (Txᴮ, σ̃ᴮ) to Alice via TMVar
 ```
 
 ### Phase 3: Pre-Signature Verification
 
 ```
-19. Alice receives (Tx_B, σ_tilde_B) from Bob
+19. Alice receives (Txᴮ, σ̃ᴮ) from Bob
 
 20. Alice verifies Bob's adapted pre-signature:
-    a. Parse σ_tilde_B = (sig_tilde_B, R_sign_B, π)
-    b. Compute R'_B = R_sign_B - Y
-    c. Compute h_B = H2(R_sign_B || pk_B || Tx_B)
-    d. Verify: sig_tilde_B · B = R'_B + h_B · pk_B
+    a. Parse σ̃ᴮ = (sig̃ᴮ, R_signᴮ, π)
+    b. Compute R'ᴮ = R_signᴮ - Y
+    c. Compute hᴮ = H₂(R_signᴮ ‖ pkᴮ ‖ Txᴮ)
+    d. Verify: sig̃ᴮ · B = R'ᴮ + hᴮ · pkᴮ
     e. Verify: Verify_zk(Y, π) = 1
     f. If valid, continue; else abort
 
@@ -251,19 +260,19 @@ Neither can execute their transaction yet (both need y to complete).
 
 ```
 21. Alice completes her signature:
-    sig_A = sig_tilde_A + y  ← Add adapter secret!
+    sigᴬ = sig̃ᴬ + y  ← Add adapter secret!
 
-22. Alice creates complete signature: σ_A = (R_sign_A, sig_A)
+22. Alice creates complete signature: σᴬ = (R_signᴬ, sigᴬ)
 
-23. Alice adds signature to Tx_A and publishes to ChainA
+23. Alice adds signature to Txᴬ and publishes to ChainA
 
 24. ChainA verifies signature:
-    sig_A · B = R_sign_A + h_A · pk_A  ✓
-    (Works because: sig_A · B = (sig_tilde_A + y) · B
-                                = sig_tilde_A · B + y · B
-                                = R'_A + h_A · pk_A + Y
-                                = (R_sign_A - Y) + h_A · pk_A + Y
-                                = R_sign_A + h_A · pk_A)
+    sigᴬ · B = R_signᴬ + hᴬ · pkᴬ  ✓
+    (Works because: sigᴬ · B = (sig̃ᴬ + y) · B
+                                = sig̃ᴬ · B + y · B
+                                = R'ᴬ + hᴬ · pkᴬ + Y
+                                = (R_signᴬ - Y) + hᴬ · pkᴬ + Y
+                                = R_signᴬ + hᴬ · pkᴬ)
 
 25. ChainA confirms transaction - Alice receives Bob's funds
 ```
@@ -271,24 +280,24 @@ Neither can execute their transaction yet (both need y to complete).
 **Bob extracts secret and publishes**:
 
 ```
-26. Bob observes Tx_A published on ChainA
+26. Bob observes Txᴬ published on ChainA
 
-27. Bob extracts Alice's complete signature σ_A = (R_sign_A, sig_A)
+27. Bob extracts Alice's complete signature σᴬ = (R_signᴬ, sigᴬ)
 
 28. Bob computes adapter secret:
-    y = sig_A - sig_tilde_A  ← THE MAGIC!
+    y = sigᴬ - sig̃ᴬ  ← THE MAGIC!
 
 29. Bob verifies extraction: Y = y · B  (should match Alice's commitment)
 
 30. Bob completes his signature:
-    sig_B = sig_tilde_B + y  ← Use extracted secret!
+    sigᴮ = sig̃ᴮ + y  ← Use extracted secret!
 
-31. Bob creates complete signature: σ_B = (R_sign_B, sig_B)
+31. Bob creates complete signature: σᴮ = (R_signᴮ, sigᴮ)
 
-32. Bob adds signature to Tx_B and publishes to ChainB
+32. Bob adds signature to Txᴮ and publishes to ChainB
 
 33. ChainB verifies signature:
-    sig_B · B = R_sign_B + h_B · pk_B  ✓
+    sigᴮ · B = R_signᴮ + hᴮ · pkᴮ  ✓
 
 34. ChainB confirms transaction - Bob receives Alice's funds
 
@@ -300,22 +309,22 @@ Neither can execute their transaction yet (both need y to complete).
 **Cryptographic Linkage**:
 
 - Both adapted pre-signatures use the **same Y** value
-- Alice's pre-sig: `sig_tilde_A = r_A + h_A · sk0_A` with nonce `R_sign_A = r_A·B + Y`
-- Bob's pre-sig: `sig_tilde_B = r_B + h_B · sk0_B` with nonce `R_sign_B = r_B·B + Y`
+- Alice's pre-sig: sig̃ᴬ = rᴬ + hᴬ · sk₀ᴬ with nonce R_signᴬ = rᴬ·B + Y
+- Bob's pre-sig: sig̃ᴮ = rᴮ + hᴮ · sk₀ᴮ with nonce R_signᴮ = rᴮ·B + Y
 
 **Forward Direction (Alice → Bob)**:
 
-- Alice cannot publish valid signature without adding `y`
-- When Alice publishes `sig_A = sig_tilde_A + y`, the value `y` becomes extractable
-- Bob computes: `y = sig_A - sig_tilde_A` (he has both values!)
+- Alice cannot publish valid signature without adding y
+- When Alice publishes sigᴬ = sig̃ᴬ + y, the value y becomes extractable
+- Bob computes: y = sigᴬ - sig̃ᴬ (he has both values!)
 
 **Reverse Direction (Bob cannot proceed without Alice)**:
 
-- Bob cannot compute `sig_B` without knowing `y`
-- Bob cannot learn `y` until Alice publishes `sig_A`
-- If Alice never publishes, Bob never learns `y`, neither swap completes
+- Bob cannot compute sigᴮ without knowing y
+- Bob cannot learn y until Alice publishes sigᴬ
+- If Alice never publishes, Bob never learns y, neither swap completes
 
-**Atomicity**: Alice cannot claim Bob's funds without revealing `y`, and once `y` is revealed, Bob can always claim Alice's funds.
+**Atomicity**: Alice cannot claim Bob's funds without revealing y, and once y is revealed, Bob can always claim Alice's funds.
 
 ## Security Properties
 
@@ -323,7 +332,7 @@ Neither can execute their transaction yet (both need y to complete).
 
 **Property**: Either both transactions complete, or neither completes.
 
-**Guarantee**: Once Bob publishes his transaction (revealing `t`), Alice can extract `t` and complete hers. If Bob never publishes, Alice never reveals her transaction, so neither side loses funds.
+**Guarantee**: Once Alice publishes her transaction (revealing y), Bob can extract y and complete his. If Alice never publishes, Bob never learns y, so neither side loses funds.
 
 ### Fairness
 
@@ -331,8 +340,8 @@ Neither can execute their transaction yet (both need y to complete).
 
 **Guarantee**:
 
-- Bob cannot take Alice's funds without revealing `t`
-- Once Bob reveals `t`, Alice is guaranteed to learn it
+- Alice cannot take Bob's funds without revealing y
+- Once Alice reveals y, Bob is guaranteed to learn it
 - If either party aborts early, no funds are exchanged
 
 ### Privacy
