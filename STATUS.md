@@ -53,6 +53,7 @@
 - ✅ AtomicSwap.Logging - Comprehensive verbose logging
 - ✅ AtomicSwap.Protocol.Alice - Complete Alice's thread logic
 - ✅ AtomicSwap.Protocol.Bob - Complete Bob's thread logic
+- ✅ **Adapter Secret Extraction** - Bob correctly extracts y from Alice's signature
 
 ### 🔴 Pending (Week 4-5)
 
@@ -93,7 +94,8 @@
 ## Git History
 
 ```
-e632548 (HEAD -> main) Fix all compilation warnings
+dae7de8 (HEAD -> main) Implement actual adapter secret extraction in Bob's protocol
+e632548 Fix all compilation warnings
 69938c6 Use BlockArguments syntax in test suite
 69e83bc Add hexadecimal Show instances using DerivingVia
 c32e4e7 Complete cryptography implementation with comprehensive tests
@@ -252,11 +254,12 @@ Following `IMPLEMENTATION-PLAN.md`:
 ✅ Crypto tests passing (17/17)
 ✅ Hex debug output
 ✅ Modern Haskell patterns
+✅ **Adapter secret extraction working** (Bob extracts y from Alice's signature)
 🔴 Full protocol test pending
 🔴 Documentation examples pending
 
 ---
 
-**Status**: Protocol implementation complete and compiling with zero warnings
+**Status**: Critical adapter secret extraction fix complete, ready for integration testing
 **Blockers**: None
-**Next**: Integration testing (happy path scenario)
+**Next**: Implement happy path integration test with io-sim

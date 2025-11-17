@@ -681,12 +681,17 @@ The following gaps and improvements from the code review must be addressed:
 
 ### Critical Issues (Must Fix for v1.0)
 
-1. **Complete Bob's Adapter Secret Extraction** ⚠️ BLOCKING
-   - **File**: `src/AtomicSwap/Protocol/Bob.hs:287-309`
-   - **Issue**: Currently uses fallback `signREdDSA` instead of extracting secret from Alice's signature
-   - **Fix**: Implement actual extraction: `y = alice_sig - alice_presig`, then `sig_B = sig_tilde_B + y`
-   - **Impact**: Without this, atomic swap property is NOT demonstrated
-   - **Timeline**: Week 4 Day 1 (integrate with happy path test)
+1. **Complete Bob's Adapter Secret Extraction** ✅ FIXED (2025-11-15)
+   - **File**: `src/AtomicSwap/Protocol/Bob.hs:287-358`
+   - **Issue**: ~~Currently uses fallback `signREdDSA` instead of extracting secret from Alice's signature~~
+   - **Fix**: ✅ Implemented actual extraction: `y = alice_sig - alice_presig`, then `sig_B = sig_tilde_B + y`
+   - **Implementation**:
+     - Added `CompleteSignatureMsg` to `Message` type
+     - Alice sends complete signature after publishing to ChainA
+     - Bob receives, extracts adapter secret using `extractAdapterSecret`
+     - Bob completes his signature using `adaptSignature`
+   - **Impact**: Atomic swap property now correctly demonstrated
+   - **Commit**: `dae7de8` - "Implement actual adapter secret extraction in Bob's protocol"
 
 2. **Enable NIZK Verification**
    - **File**: `src/AtomicSwap/Crypto/Adapter.hs:206`
@@ -778,8 +783,8 @@ The following gaps and improvements from the code review must be addressed:
 
 **Day 1: Happy Path Integration Test**
 
-- [x] Implement happy path test with io-sim ✓ (from review #3)
-- [x] **FIX Bob's adapter secret extraction** ⚠️ (from review #1)
+- [ ] Implement happy path test with io-sim (from review #3)
+- [x] **FIX Bob's adapter secret extraction** ✅ COMPLETE (from review #1, commit dae7de8)
 - [ ] Verify verbose logging works
 - [ ] Test isolation (cleanup)
 
@@ -840,6 +845,6 @@ The following gaps and improvements from the code review must be addressed:
 
 ---
 
-**Status**: ✅ Plan updated with code review findings integrated
-**Blockers**: Bob's adapter secret extraction (critical gap)
-**Next Step**: Fix Bob's extraction, then proceed with Week 4 testing
+**Status**: ✅ Critical blocker resolved (adapter secret extraction complete)
+**Blockers**: None
+**Next Step**: Implement happy path integration test with io-sim (Week 4 Day 1)
