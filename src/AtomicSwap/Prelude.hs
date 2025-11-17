@@ -33,8 +33,8 @@ import AtomicSwap.Types
   , Message (..)
   , NIZKProof (..)
   , Output (..)
+  , Participant (..)
   , Party (..)
-  , PartyName
   , PrivateKey (..)
   , PublicKey (..)
   , Signature (..)
@@ -54,8 +54,8 @@ import Control.Monad.Class.MonadSTM
 -- Logging Utilities -----------------------------------------------------------
 
 -- | Log an informational message with party identification
-logInfo :: MonadIO m => PartyName -> Text -> m ()
-logInfo party msg = putTextLn ("[" <> party <> "] " <> msg)
+logInfo :: MonadIO m => Participant -> Text -> m ()
+logInfo party msg = putTextLn ("[" <> show party <> "] " <> msg)
 
 -- | Log a protocol phase header
 logPhase :: MonadIO m => Text -> m ()

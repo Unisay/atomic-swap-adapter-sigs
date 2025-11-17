@@ -8,7 +8,7 @@ implementation, including parties, transactions, UTXOs, and protocol state.
 module AtomicSwap.Types
   ( -- * Party Types
     Party (..)
-  , PartyName
+  , Participant (..)
 
     -- * Cryptographic Types
   , PrivateKey (..)
@@ -37,6 +37,7 @@ module AtomicSwap.Types
 import Data.ByteString.Base16 qualified as Base16
 import Data.Text.Encoding qualified as TE
 import GHC.Show qualified
+import NoThunks.Class (NoThunks (..))
 
 --------------------------------------------------------------------------------
 -- Helper for Hex-Encoded Show Instances ---------------------------------------
@@ -56,16 +57,20 @@ instance GHC.Show.Show HexBytes where
 --------------------------------------------------------------------------------
 -- Party Types -----------------------------------------------------------------
 
--- | A party participating in the atomic swap protocol
+-- | Protocol participant identifier (simple enum)
+data Participant = Alice | Bob
+  deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
+  deriving anyclass NFData
+
+instance NoThunks Participant
+
+-- | A party participating in the atomic swap protocol (full state)
 data Party = Party
-  { partyName :: PartyName
+  { partyParticipant :: Participant
   , partyPrivateKey :: Ed25519PrivateKey
   , partyPublicKey :: PublicKey
   }
   deriving stock (Show, Eq)
-
--- | Name identifier for a party (e.g., "Alice", "Bob")
-type PartyName = Text
 
 --------------------------------------------------------------------------------
 -- Cryptographic Types ---------------------------------------------------------

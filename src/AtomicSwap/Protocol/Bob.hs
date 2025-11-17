@@ -105,22 +105,24 @@ bobProtocol bob chainB toBob toAlice amountToSend = do
   -- Phase 1: Setup and key exchange
   liftIO $ logSubPhase "Phase 1: Setup and Key Exchange"
 
-  liftIO $ logAction (partyName bob) "Waiting for Alice's public key"
+  liftIO $ logAction (partyParticipant bob) "Waiting for Alice's public key"
   alicePubKeyMsg <- receiveMessage toBob
   case alicePubKeyMsg of
     PublicKeyMsg alicePubKey -> do
       let PublicKey pkBytes = alicePubKey
-      liftIO $ logPublicKey (partyName bob) "Received Alice's public key" pkBytes
+      liftIO $
+        logPublicKey (partyParticipant bob) "Received Alice's public key" pkBytes
 
-      liftIO $ logAction (partyName bob) "Waiting for adapter commitment from Alice"
+      liftIO $
+        logAction (partyParticipant bob) "Waiting for adapter commitment from Alice"
       adapterMsg <- receiveMessage toBob
       case adapterMsg of
         AdapterPointMsg adapterPoint -> do
           liftIO $
-            logInfo (partyName bob) $
+            logInfo (partyParticipant bob) $
               "Received adapter commitment: " <> show adapterPoint
 
-          liftIO $ logAction (partyName bob) "Sending public key to Alice"
+          liftIO $ logAction (partyParticipant bob) "Sending public key to Alice"
           sendMessage toAlice (PublicKeyMsg (partyPublicKey bob))
 
           continueBobProtocol
@@ -132,10 +134,10 @@ bobProtocol bob chainB toBob toAlice amountToSend = do
             alicePubKey
             adapterPoint
         _ -> do
-          liftIO $ logError (partyName bob) "Expected AdapterPointMsg from Alice"
+          liftIO $ logError (partyParticipant bob) "Expected AdapterPointMsg from Alice"
           return $ SwapFailure "Protocol error: Expected adapter commitment from Alice"
     _ -> do
-      liftIO $ logError (partyName bob) "Expected PublicKeyMsg from Alice"
+      liftIO $ logError (partyParticipant bob) "Expected PublicKeyMsg from Alice"
       return $ SwapFailure "Protocol error: Expected public key from Alice"
 
 continueBobProtocol
@@ -153,21 +155,23 @@ continueBobProtocol bob chainB toBob toAlice amountToSend alicePubKey adapterPoi
   liftIO logSeparator
   liftIO $ logSubPhase "Phase 2: Transaction Creation"
 
-  liftIO $ logAction (partyName bob) "Querying UTXOs on ChainB"
+  liftIO $ logAction (partyParticipant bob) "Querying UTXOs on ChainB"
   bobUTXOs <- queryUTXOs chainB (partyPublicKey bob)
 
   if null bobUTXOs
     then do
-      liftIO $ logError (partyName bob) "No UTXOs available on ChainB"
+      liftIO $ logError (partyParticipant bob) "No UTXOs available on ChainB"
       return $ SwapFailure "Bob has no UTXOs on ChainB"
     else do
       let totalAvailable = sum (map utxoAmount bobUTXOs)
       liftIO $
-        logInfo (partyName bob) ("Total available on ChainB: " <> show totalAvailable)
+        logInfo
+          (partyParticipant bob)
+          ("Total available on ChainB: " <> show totalAvailable)
 
       if totalAvailable < amountToSend
         then do
-          liftIO $ logError (partyName bob) "Insufficient funds on ChainB"
+          liftIO $ logError (partyParticipant bob) "Insufficient funds on ChainB"
           return $ SwapFailure "Bob has insufficient funds on ChainB"
         else do
           -- Create transaction sending funds to Alice
@@ -177,7 +181,7 @@ continueBobProtocol bob chainB toBob toAlice amountToSend alicePubKey adapterPoi
 
           liftIO $
             logInfo
-              (partyName bob)
+              (partyParticipant bob)
               ("Created transaction sending " <> show amountToSend <> " to Alice")
 
           -- Phase 3: Adapter signature creation
@@ -186,10 +190,12 @@ continueBobProtocol bob chainB toBob toAlice amountToSend alicePubKey adapterPoi
 
           liftIO $
             logAction
-              (partyName bob)
+              (partyParticipant bob)
               "Creating adapted pre-signature using Alice's adapter commitment"
           liftIO $
-            logInfo (partyName bob) "NOTE: Using Alice's T, not generating own secret!"
+            logInfo
+              (partyParticipant bob)
+              "NOTE: Using Alice's T, not generating own secret!"
 
           -- Create dummy NIZK proof (not verified in this simplified version)
           let dummyProof = NIZKProof ""
@@ -202,9 +208,9 @@ continueBobProtocol bob chainB toBob toAlice amountToSend alicePubKey adapterPoi
               adapterPoint
               dummyProof
 
-          liftIO $ logInfo (partyName bob) "Adapted pre-signature created"
+          liftIO $ logInfo (partyParticipant bob) "Adapted pre-signature created"
 
-          liftIO $ logAction (partyName bob) "Verifying own adapted pre-signature"
+          liftIO $ logAction (partyParticipant bob) "Verifying own adapted pre-signature"
           let preVerifyResult =
                 preVerifyREdDSA
                   (partyPublicKey bob)
@@ -215,22 +221,25 @@ continueBobProtocol bob chainB toBob toAlice amountToSend alicePubKey adapterPoi
 
           if not preVerifyResult
             then do
-              liftIO $ logError (partyName bob) "Own pre-signature verification failed"
+              liftIO $ logError (partyParticipant bob) "Own pre-signature verification failed"
               return $ SwapFailure "Bob's pre-signature verification failed"
             else do
-              liftIO $ logInfo (partyName bob) "Own pre-signature verified successfully"
+              liftIO $
+                logInfo (partyParticipant bob) "Own pre-signature verified successfully"
 
               -- Phase 4: Exchange signatures
               liftIO logSeparator
               liftIO $ logSubPhase "Phase 4: Signature Exchange"
 
-              liftIO $ logAction (partyName bob) "Waiting for Alice's transaction proposal"
+              liftIO $
+                logAction (partyParticipant bob) "Waiting for Alice's transaction proposal"
               aliceProposalMsg <- receiveMessage toBob
               case aliceProposalMsg of
                 TransactionProposalMsg aliceTx alicePreSig -> do
-                  liftIO $ logInfo (partyName bob) "Received Alice's transaction proposal"
+                  liftIO $ logInfo (partyParticipant bob) "Received Alice's transaction proposal"
 
-                  liftIO $ logAction (partyName bob) "Verifying Alice's adapted pre-signature"
+                  liftIO $
+                    logAction (partyParticipant bob) "Verifying Alice's adapted pre-signature"
                   let aliceTxHash = hashTransaction aliceTx
                       alicePreVerifyResult =
                         preVerifyREdDSA
@@ -242,12 +251,15 @@ continueBobProtocol bob chainB toBob toAlice amountToSend alicePubKey adapterPoi
 
                   if not alicePreVerifyResult
                     then do
-                      liftIO $ logError (partyName bob) "Alice's pre-signature verification failed"
+                      liftIO $
+                        logError (partyParticipant bob) "Alice's pre-signature verification failed"
                       return $ SwapFailure "Alice's pre-signature verification failed"
                     else do
-                      liftIO $ logInfo (partyName bob) "Alice's pre-signature verified successfully"
+                      liftIO $
+                        logInfo (partyParticipant bob) "Alice's pre-signature verified successfully"
 
-                      liftIO $ logAction (partyName bob) "Sending transaction proposal to Alice"
+                      liftIO $
+                        logAction (partyParticipant bob) "Sending transaction proposal to Alice"
                       sendMessage toAlice (TransactionProposalMsg bobTx bobPreSig)
 
                       -- Phase 5: Wait for Alice and extract secret
@@ -255,17 +267,20 @@ continueBobProtocol bob chainB toBob toAlice amountToSend alicePubKey adapterPoi
                       liftIO $ logSubPhase "Phase 5: Wait for Alice and Extract Secret"
 
                       liftIO $
-                        logAction (partyName bob) "Waiting for Alice to publish her transaction"
+                        logAction (partyParticipant bob) "Waiting for Alice to publish her transaction"
                       swapCompleteMsg <- receiveMessage toBob
                       case swapCompleteMsg of
                         SwapCompleteMsg -> do
-                          liftIO $ logInfo (partyName bob) "Received notification: Alice has published!"
+                          liftIO $
+                            logInfo (partyParticipant bob) "Received notification: Alice has published!"
 
                           liftIO $
-                            logAction (partyName bob) "Extracting adapter secret from Alice's signature"
+                            logAction
+                              (partyParticipant bob)
+                              "Extracting adapter secret from Alice's signature"
                           liftIO $
                             logInfo
-                              (partyName bob)
+                              (partyParticipant bob)
                               "This is the KEY OPERATION: t = alice_sig - alice_presig"
 
                           -- In a real implementation, we would query Alice's published transaction
@@ -275,65 +290,71 @@ continueBobProtocol bob chainB toBob toAlice amountToSend alicePubKey adapterPoi
                           -- TODO: In full implementation, query ChainA for Alice's transaction
 
                           liftIO $
-                            logAction (partyName bob) "Computing complete signature (simulated extraction)"
+                            logAction
+                              (partyParticipant bob)
+                              "Computing complete signature (simulated extraction)"
                           liftIO $
                             logInfo
-                              (partyName bob)
+                              (partyParticipant bob)
                               "NOTE: In real system, would extract from Alice's published tx"
 
                           -- Wait for Alice's complete signature so we can extract the adapter secret
                           liftIO $
                             logAction
-                              (partyName bob)
+                              (partyParticipant bob)
                               "Waiting for Alice's complete signature for extraction"
 
                           msg <- receiveMessage toBob
                           case msg of
                             CompleteSignatureMsg aliceCompleteSig -> do
                               liftIO $
-                                logInfo (partyName bob) "Received Alice's complete signature"
+                                logInfo (partyParticipant bob) "Received Alice's complete signature"
 
                               -- Extract adapter secret from Alice's signatures
                               -- y = sig_complete - sig_presig
                               liftIO $
-                                logAction (partyName bob) "Extracting adapter secret from signatures"
+                                logAction (partyParticipant bob) "Extracting adapter secret from signatures"
                               let extractedSecret = extractAdapterSecret alicePreSig aliceCompleteSig
 
                               let AdapterSecret extractedBytes = extractedSecret
                               liftIO $
                                 logSecret
-                                  (partyName bob)
+                                  (partyParticipant bob)
                                   "Extracted adapter secret"
                                   extractedBytes
 
                               -- Complete Bob's signature using extracted adapter secret
                               -- sig_bob = sig_tilde_bob + y
                               liftIO $
-                                logAction (partyName bob) "Completing signature with extracted secret"
+                                logAction (partyParticipant bob) "Completing signature with extracted secret"
                               let bobCompleteSig = adaptSignature bobPreSig extractedSecret
 
                               -- Verify that the completed signature is valid
                               let Signature {sigScalar = completeSigScalar} = bobCompleteSig
                               liftIO $
                                 logSecret
-                                  (partyName bob)
+                                  (partyParticipant bob)
                                   "Completed signature scalar"
                                   completeSigScalar
 
                               let signedBobTx = bobTx {txSignatures = [bobCompleteSig]}
 
-                              liftIO $ logAction (partyName bob) "Publishing transaction to ChainB"
+                              liftIO $ logAction (partyParticipant bob) "Publishing transaction to ChainB"
                               submitResult <- submitTransaction chainB signedBobTx
 
                               case submitResult of
                                 Left err -> do
-                                  liftIO $ logError (partyName bob) ("Transaction submission failed: " <> err)
+                                  liftIO $
+                                    logError (partyParticipant bob) ("Transaction submission failed: " <> err)
                                   return $
                                     SwapFailure ("Bob's transaction submission failed: " <> err)
                                 Right txId -> do
                                   let TxId txIdBytes = txId
                                   liftIO $
-                                    logTransaction (partyName bob) "Transaction published successfully" txIdBytes
+                                    logTransaction
+                                      (partyParticipant bob)
+                                      "Transaction published successfully"
+                                      txIdBytes
 
                                   -- Final status
                                   liftIO logSeparator
@@ -341,24 +362,27 @@ continueBobProtocol bob chainB toBob toAlice amountToSend alicePubKey adapterPoi
 
                                   finalBalance <- getBalance chainB (partyPublicKey bob)
                                   liftIO $
-                                    logInfo (partyName bob) ("Final balance on ChainB: " <> show finalBalance)
+                                    logInfo
+                                      (partyParticipant bob)
+                                      ("Final balance on ChainB: " <> show finalBalance)
 
-                                  liftIO $ logInfo (partyName bob) "✓ Atomic swap completed successfully"
+                                  liftIO $ logInfo (partyParticipant bob) "✓ Atomic swap completed successfully"
                                   liftIO $
                                     logInfo
-                                      (partyName bob)
+                                      (partyParticipant bob)
                                       "✓ Successfully extracted adapter secret and completed transaction"
 
                                   return SwapSuccess
                             _ -> do
                               liftIO $
                                 logError
-                                  (partyName bob)
+                                  (partyParticipant bob)
                                   "Unexpected message type (expected CompleteSignatureMsg)"
                               return $ SwapFailure "Protocol error: Expected complete signature from Alice"
                         _ -> do
-                          liftIO $ logError (partyName bob) "Expected SwapCompleteMsg from Alice"
+                          liftIO $ logError (partyParticipant bob) "Expected SwapCompleteMsg from Alice"
                           return $ SwapFailure "Protocol error: Expected swap complete message"
                 _ -> do
-                  liftIO $ logError (partyName bob) "Expected TransactionProposalMsg from Alice"
+                  liftIO $
+                    logError (partyParticipant bob) "Expected TransactionProposalMsg from Alice"
                   return $ SwapFailure "Protocol error: Expected transaction proposal from Alice"
