@@ -75,6 +75,7 @@ import AtomicSwap.Types
   ( AdapterPoint (..)
   , AdapterSecret (..)
   , Ed25519PrivateKey (..)
+  , NIZKProof (..)
   , PrivateKey (..)
   , PublicKey (..)
   )
@@ -109,7 +110,8 @@ mainPage simState =
           div_ [class_ "container"] do
             header_ [class_ "header"] do
               h1_ "Atomic Swap Simulator"
-              p_ "Step-by-step execution of adapter signature protocol"
+              p_
+                "Step-by-step simulator of atomic swap protocol based on adapter signatures and non-interactive ZK proofs"
 
             div_ [class_ "main-content"] do
               -- Left column: Alice's state
@@ -198,6 +200,14 @@ describeUpdates participant updates =
       "Alice generated adapter secret y"
     [SetAdapterCommitment _ _] ->
       "Alice computed commitment Y = y·B"
+    [SetOtherPartyCommitment Bob _, SetSentCommitment Alice _] ->
+      "Alice shared commitment Y with Bob"
+    [SetNIZKProof _ _] ->
+      "Alice generated NIZK proof for commitment"
+    [SetOtherPartyNIZKProof Bob _, SetSentNIZKProof Alice _] ->
+      "Alice shared NIZK proof with Bob"
+    [SetNIZKProofVerified Bob _] ->
+      "Bob verified Alice's NIZK proof successfully"
     _ -> case participant of
       Alice -> "Alice performed action"
       Bob -> "Bob performed action"
@@ -315,13 +325,25 @@ renderAliceStateFields partyState = do
   case SM.maybe Nothing Just (psAdapterCommitment partyState) of
     Just (AdapterPoint commitBytes) -> do
       div_ [class_ "state-item state-set"] do
-        span_ [class_ "state-label"] "Commitment (Y)"
+        span_ [class_ "state-label"] "Seal (Y)"
         span_ [class_ "state-value", title_ (formatHex commitBytes)] $
           toHtml $
             formatHex commitBytes
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
-        span_ [class_ "state-label"] "Commitment (Y)"
+        span_ [class_ "state-label"] "Seal (Y)"
+        span_ [class_ "state-value"] "[not set]"
+  -- NIZK Proof
+  case SM.maybe Nothing Just (psNIZKProof partyState) of
+    Just (NIZKProof proofBytes) -> do
+      div_ [class_ "state-item state-set"] do
+        span_ [class_ "state-label"] "NIZK Proof"
+        span_ [class_ "state-value", title_ (formatHex proofBytes)] $
+          toHtml $
+            formatHex proofBytes
+    Nothing -> do
+      div_ [class_ "state-item state-unset"] do
+        span_ [class_ "state-label"] "NIZK Proof"
         span_ [class_ "state-value"] "[not set]"
 
 -- | Render Alice's complete state (with OOB wrapper)
@@ -378,6 +400,38 @@ renderBobStateFields partyState = do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Alice's Public Key"
         span_ [class_ "state-value"] "[not set]"
+  -- Alice's Commitment (received from Alice)
+  case SM.maybe Nothing Just (psOtherPartyCommitment partyState) of
+    Just (AdapterPoint commitBytes) -> do
+      div_ [class_ "state-item state-set"] do
+        span_ [class_ "state-label"] "Alice's Seal (Y)"
+        span_ [class_ "state-value", title_ (formatHex commitBytes)] $
+          toHtml $
+            formatHex commitBytes
+    Nothing -> do
+      div_ [class_ "state-item state-unset"] do
+        span_ [class_ "state-label"] "Alice's Seal (Y)"
+        span_ [class_ "state-value"] "[not set]"
+  -- Alice's NIZK Proof (received from Alice)
+  case SM.maybe Nothing Just (psOtherPartyNIZKProof partyState) of
+    Just (NIZKProof proofBytes) -> do
+      div_ [class_ "state-item state-set"] do
+        span_ [class_ "state-label"] "Alice's NIZK Proof"
+        span_ [class_ "state-value", title_ (formatHex proofBytes)] $
+          toHtml $
+            formatHex proofBytes
+    Nothing -> do
+      div_ [class_ "state-item state-unset"] do
+        span_ [class_ "state-label"] "Alice's NIZK Proof"
+        span_ [class_ "state-value"] "[not set]"
+  -- NIZK Proof Verification Status
+  if psNIZKProofVerified partyState
+    then div_ [class_ "state-item state-set"] do
+      span_ [class_ "state-label"] "NIZK Proof Status"
+      span_ [class_ "state-value"] "✓ Verified"
+    else div_ [class_ "state-item state-unset"] do
+      span_ [class_ "state-label"] "NIZK Proof Status"
+      span_ [class_ "state-value"] "[not verified]"
   -- Extracted Secret (Bob only)
   div_ [class_ "state-item state-unset"] do
     span_ [class_ "state-label"] "Extracted Secret"
@@ -400,11 +454,21 @@ renderAliceActionsFields partyState = do
       sentPublicKey = psSentPublicKey partyState
       hasSecret = SM.isJust (psAdapterSecret partyState)
       hasCommitment = SM.isJust (psAdapterCommitment partyState)
-      hasAnyActions = not hasPublicKey || not hasSecret || (hasSecret && not hasCommitment)
+      sentCommitment = psSentCommitment partyState
+      hasNIZKProof = SM.isJust (psNIZKProof partyState)
+      sentNIZKProof = psSentNIZKProof partyState
+      hasAnyActions =
+        not hasPublicKey
+          || (hasPublicKey && not sentPublicKey)
+          || not hasSecret
+          || (hasSecret && not hasCommitment)
+          || (hasCommitment && not sentCommitment)
+          || (sentCommitment && not hasNIZKProof)
+          || (hasNIZKProof && not sentNIZKProof)
 
   if not hasAnyActions
-    then div_ [class_ "no-actions"] "All actions complete"
-    else do
+    then div_ [class_ "no-actions"] "Waiting for Bob..."
+    else div_ [class_ "button-group"] do
       -- Show keypair button ONLY if not generated
       unless hasPublicKey $
         button_
@@ -413,7 +477,7 @@ renderAliceActionsFields partyState = do
           , hxTarget_ "#timeline"
           , hxSwap_ "beforeend"
           ]
-          "Generate keypair"
+          "Generate Keys"
       -- Show send public key button if has key but hasn't sent it yet
       when (hasPublicKey && not sentPublicKey) $
         button_
@@ -422,7 +486,7 @@ renderAliceActionsFields partyState = do
           , hxTarget_ "#timeline"
           , hxSwap_ "beforeend"
           ]
-          "Send Public Key to Bob"
+          "Publish Pubkey"
       -- Show secret button ONLY if not generated
       unless hasSecret $
         button_
@@ -431,7 +495,7 @@ renderAliceActionsFields partyState = do
           , hxTarget_ "#timeline"
           , hxSwap_ "beforeend"
           ]
-          "Generate Secret y"
+          "Generate Secret"
       -- Show commitment button ONLY if has secret but no commitment
       when (hasSecret && not hasCommitment) $
         button_
@@ -440,7 +504,34 @@ renderAliceActionsFields partyState = do
           , hxTarget_ "#timeline"
           , hxSwap_ "beforeend"
           ]
-          "Make Commitment Y"
+          "Seal Secret"
+      -- Show send commitment button if has commitment but hasn't sent it yet
+      when (hasCommitment && not sentCommitment) $
+        button_
+          [ class_ "party-button alice-button"
+          , hxPost_ "/step/alice-send-commitment"
+          , hxTarget_ "#timeline"
+          , hxSwap_ "beforeend"
+          ]
+          "Publish Seal"
+      -- Show NIZK proof generation button ONLY if has sent commitment but no proof
+      when (sentCommitment && not hasNIZKProof) $
+        button_
+          [ class_ "party-button alice-button"
+          , hxPost_ "/step/alice-generate-nizk-proof"
+          , hxTarget_ "#timeline"
+          , hxSwap_ "beforeend"
+          ]
+          "Prove Seal"
+      -- Show send NIZK proof button if has proof but hasn't sent it yet
+      when (hasNIZKProof && not sentNIZKProof) $
+        button_
+          [ class_ "party-button alice-button"
+          , hxPost_ "/step/alice-send-nizk-proof"
+          , hxTarget_ "#timeline"
+          , hxSwap_ "beforeend"
+          ]
+          "Publish Proof"
 
 -- | Render Alice's actions with OOB wrapper
 renderAliceActionsUpdate :: PartyState -> Html ()
@@ -454,27 +545,42 @@ renderBobActionsFields :: PartyState -> Html ()
 renderBobActionsFields partyState = do
   let hasPublicKey = SM.isJust (psPublicKey partyState)
       sentPublicKey = psSentPublicKey partyState
+      hasCommitment = SM.isJust (psOtherPartyCommitment partyState)
+      hasProof = SM.isJust (psOtherPartyNIZKProof partyState)
+      proofVerified = psNIZKProofVerified partyState
+      canVerifyProof = hasCommitment && hasProof && not proofVerified
+      hasAnyActions = not hasPublicKey || (hasPublicKey && not sentPublicKey) || canVerifyProof
 
-  if not hasPublicKey
-    then
-      button_
-        [ class_ "party-button bob-button"
-        , hxPost_ "/step/bob-keygen"
-        , hxTarget_ "#timeline"
-        , hxSwap_ "beforeend"
-        ]
-        "Generate keypair"
-    else do
-      -- Show send public key button only if hasn't sent yet
-      unless sentPublicKey $
+  if not hasAnyActions
+    then div_ [class_ "no-actions"] "Waiting for Alice..."
+    else div_ [class_ "button-group"] do
+      -- Show keypair button ONLY if not generated
+      unless hasPublicKey $
+        button_
+          [ class_ "party-button bob-button"
+          , hxPost_ "/step/bob-keygen"
+          , hxTarget_ "#timeline"
+          , hxSwap_ "beforeend"
+          ]
+          "Generate Keys"
+      -- Show send public key button only if has key but hasn't sent yet
+      when (hasPublicKey && not sentPublicKey) $
         button_
           [ class_ "party-button bob-button"
           , hxPost_ "/step/bob-send-public-key"
           , hxTarget_ "#timeline"
           , hxSwap_ "beforeend"
           ]
-          "Send Public Key to Alice"
-      div_ [class_ "no-actions"] "Waiting for Alice..."
+          "Publish Pubkey"
+      -- Show verify NIZK proof button if has both commitment and proof but not verified
+      when canVerifyProof $
+        button_
+          [ class_ "party-button bob-button"
+          , hxPost_ "/step/bob-verify-nizk-proof"
+          , hxTarget_ "#timeline"
+          , hxSwap_ "beforeend"
+          ]
+          "Verify Proof"
 
 -- | Render Bob's actions with OOB wrapper
 renderBobActionsUpdate :: PartyState -> Html ()
