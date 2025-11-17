@@ -61,6 +61,12 @@ data PartyState = PartyState
   , psSentPublicKey :: Bool
   , psAdapterSecret :: SM.Maybe AdapterSecret
   , psAdapterCommitment :: SM.Maybe AdapterPoint
+  , psSentCommitment :: Bool
+  , psOtherPartyCommitment :: SM.Maybe AdapterPoint
+  , psNIZKProof :: SM.Maybe NIZKProof
+  , psSentNIZKProof :: Bool
+  , psOtherPartyNIZKProof :: SM.Maybe NIZKProof
+  , psNIZKProofVerified :: Bool
   , psPreSignature :: SM.Maybe Signature
   , psObservedTxs :: Seq.Seq TxId
   , psIsWaiting :: Bool
@@ -80,6 +86,12 @@ emptyPartyState =
       , psSentPublicKey = False
       , psAdapterSecret = SM.Nothing
       , psAdapterCommitment = SM.Nothing
+      , psSentCommitment = False
+      , psOtherPartyCommitment = SM.Nothing
+      , psNIZKProof = SM.Nothing
+      , psSentNIZKProof = False
+      , psOtherPartyNIZKProof = SM.Nothing
+      , psNIZKProofVerified = False
       , psPreSignature = SM.Nothing
       , psObservedTxs = Seq.empty
       , psIsWaiting = False
@@ -162,6 +174,24 @@ applyUpdate party update partyState = case update of
   SetAdapterCommitment p commitment
     | p == party ->
         partyState {psAdapterCommitment = SM.Just commitment}
+  SetSentCommitment p sent
+    | p == party ->
+        partyState {psSentCommitment = sent}
+  SetOtherPartyCommitment p commitment
+    | p == party ->
+        partyState {psOtherPartyCommitment = SM.Just commitment}
+  SetNIZKProof p proof
+    | p == party ->
+        partyState {psNIZKProof = SM.Just proof}
+  SetSentNIZKProof p sent
+    | p == party ->
+        partyState {psSentNIZKProof = sent}
+  SetOtherPartyNIZKProof p proof
+    | p == party ->
+        partyState {psOtherPartyNIZKProof = SM.Just proof}
+  SetNIZKProofVerified p verified
+    | p == party ->
+        partyState {psNIZKProofVerified = verified}
   SetPreSignature p sig
     | p == party ->
         partyState {psPreSignature = SM.Just sig}

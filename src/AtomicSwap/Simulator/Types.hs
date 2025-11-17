@@ -94,6 +94,12 @@ data StateUpdate
   | SetSentPublicKey Participant Bool
   | SetAdapterSecret Participant AdapterSecret
   | SetAdapterCommitment Participant AdapterPoint
+  | SetSentCommitment Participant Bool
+  | SetOtherPartyCommitment Participant AdapterPoint
+  | SetNIZKProof Participant NIZKProof
+  | SetSentNIZKProof Participant Bool
+  | SetOtherPartyNIZKProof Participant NIZKProof
+  | SetNIZKProofVerified Participant Bool
   | SetPreSignature Participant Signature
   | SetPreSignatureNonce Participant ByteString
   | -- Blockchain state

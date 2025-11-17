@@ -38,3 +38,9 @@ class Monad m => MonadSimulator m where
 
   -- | Generate adapter commitment from secret (Y = y·B)
   generateAdapterCommitment :: AdapterSecret -> m AdapterPoint
+
+  -- | Generate NIZK proof for adapter commitment
+  generateNIZKProof :: AdapterSecret -> AdapterPoint -> m NIZKProof
+
+  -- | Verify NIZK proof for adapter commitment
+  verifyNIZKProof :: AdapterPoint -> NIZKProof -> m Bool

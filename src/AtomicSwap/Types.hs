@@ -118,7 +118,8 @@ newtype AdapterPoint = AdapterPoint ByteString
 
 -- | NIZK proof for discrete logarithm relation
 newtype NIZKProof = NIZKProof ByteString
-  deriving stock Eq
+  deriving stock (Eq, Generic)
+  deriving anyclass (NFData, NoThunks)
   deriving Show via HexBytes
 
 --------------------------------------------------------------------------------

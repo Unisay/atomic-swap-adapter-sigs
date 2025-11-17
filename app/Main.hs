@@ -33,12 +33,16 @@ import AtomicSwap.Simulator.State
   )
 import AtomicSwap.Simulator.Steps
   ( StepResult (..)
+  , executeAliceGenerateNIZKProof
   , executeAliceGenerateSecret
   , executeAliceKeygen
   , executeAliceMakeCommitment
+  , executeAliceSendCommitment
+  , executeAliceSendNIZKProof
   , executeAliceSendPublicKey
   , executeBobKeygen
   , executeBobSendPublicKey
+  , executeBobVerifyNIZKProof
   )
 import Data.IORef.Strict (StrictIORef)
 import Data.IORef.Strict qualified as Strict
@@ -114,6 +118,14 @@ mkApp stateRef req respond =
       executeWithStateDiff stateRef executeAliceSendPublicKey respond
     ("POST", ["step", "bob-send-public-key"]) ->
       executeWithStateDiff stateRef executeBobSendPublicKey respond
+    ("POST", ["step", "alice-send-commitment"]) ->
+      executeWithStateDiff stateRef executeAliceSendCommitment respond
+    ("POST", ["step", "alice-generate-nizk-proof"]) ->
+      executeWithStateDiff stateRef executeAliceGenerateNIZKProof respond
+    ("POST", ["step", "alice-send-nizk-proof"]) ->
+      executeWithStateDiff stateRef executeAliceSendNIZKProof respond
+    ("POST", ["step", "bob-verify-nizk-proof"]) ->
+      executeWithStateDiff stateRef executeBobVerifyNIZKProof respond
     ("POST", ["reset"]) -> do
       Strict.writeIORef stateRef emptySimulatorState
       currentState <- Strict.readIORef stateRef

@@ -34,6 +34,10 @@ module AtomicSwap.Simulator.Steps
   , executeAliceMakeCommitment
   , executeAliceSendPublicKey
   , executeBobSendPublicKey
+  , executeAliceSendCommitment
+  , executeAliceGenerateNIZKProof
+  , executeAliceSendNIZKProof
+  , executeBobVerifyNIZKProof
   ) where
 
 import Prelude
@@ -137,3 +141,62 @@ executeBobSendPublicKey = do
         , SetSentPublicKey Bob True
         ]
       ok
+
+-- | Execute Alice's NIZK proof generation step
+executeAliceGenerateNIZKProof :: MonadSimulator m => m StepResult
+executeAliceGenerateNIZKProof = do
+  aliceState <- getPartyState Alice
+  case (psAdapterSecret aliceState, psAdapterCommitment aliceState) of
+    (SM.Nothing, _) -> failed "adapter secret not set"
+    (_, SM.Nothing) -> failed "adapter commitment not set"
+    (SM.Just secret, SM.Just commitment) -> do
+      proof <- generateNIZKProof secret commitment
+      applyUpdates Alice (UserInputs "") [SetNIZKProof Alice proof]
+      ok
+
+-- | Execute Alice sending commitment to Bob
+executeAliceSendCommitment :: MonadSimulator m => m StepResult
+executeAliceSendCommitment = do
+  aliceState <- getPartyState Alice
+  case psAdapterCommitment aliceState of
+    SM.Nothing -> failed "Adapter commitment not generated"
+    SM.Just commitment -> do
+      -- Bob receives commitment, Alice marks as sent (cross-participant update)
+      applyUpdates
+        Alice
+        (UserInputs "")
+        [ SetOtherPartyCommitment Bob commitment
+        , SetSentCommitment Alice True
+        ]
+      ok
+
+-- | Execute Alice sending NIZK proof to Bob
+executeAliceSendNIZKProof :: MonadSimulator m => m StepResult
+executeAliceSendNIZKProof = do
+  aliceState <- getPartyState Alice
+  case psNIZKProof aliceState of
+    SM.Nothing -> failed "NIZK proof not generated"
+    SM.Just proof -> do
+      -- Bob receives NIZK proof, Alice marks as sent (cross-participant update)
+      applyUpdates
+        Alice
+        (UserInputs "")
+        [ SetOtherPartyNIZKProof Bob proof
+        , SetSentNIZKProof Alice True
+        ]
+      ok
+
+-- | Execute Bob's NIZK proof verification
+executeBobVerifyNIZKProof :: MonadSimulator m => m StepResult
+executeBobVerifyNIZKProof = do
+  bobState <- getPartyState Bob
+  case (psOtherPartyCommitment bobState, psOtherPartyNIZKProof bobState) of
+    (SM.Nothing, _) -> failed "Alice's commitment not received"
+    (_, SM.Nothing) -> failed "Alice's NIZK proof not received"
+    (SM.Just commitment, SM.Just proof) -> do
+      isValid <- verifyNIZKProof commitment proof
+      if isValid
+        then do
+          applyUpdates Bob (UserInputs "") [SetNIZKProofVerified Bob True]
+          ok
+        else failed "NIZK proof verification failed"

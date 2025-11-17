@@ -17,6 +17,7 @@ module AtomicSwap.Simulator.Run
 
 import AtomicSwap.Crypto.Adapter qualified as Adapter
 import AtomicSwap.Crypto.Keys qualified as Keys
+import AtomicSwap.Crypto.NIZK qualified as NIZK
 import AtomicSwap.Simulator.Class (MonadSimulator (..))
 import AtomicSwap.Simulator.State (SimulatorState, appendStep)
 import AtomicSwap.Simulator.State qualified as State
@@ -58,3 +59,9 @@ instance MonadSimulator SimulatorT where
 
   generateAdapterCommitment secret = SimulatorT $ ReaderT \_ ->
     pure $ Adapter.generateAdapterCommitment secret
+
+  generateNIZKProof secret commitment = SimulatorT $ ReaderT \_ ->
+    NIZK.proveDiscreteLog secret commitment
+
+  verifyNIZKProof commitment proof = SimulatorT $ ReaderT \_ ->
+    pure $ NIZK.verifyDiscreteLog commitment proof
