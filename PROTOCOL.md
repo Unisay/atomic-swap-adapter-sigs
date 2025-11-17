@@ -8,10 +8,10 @@ This document describes the adapter signature-based atomic swap protocol impleme
 
 This document uses **Unicode mathematical notation** throughout for maximum compatibility:
 
-- **Subscripts**: sk₀ᴬ, sk₁ᴮ (instead of sk_0^A, sk_1^B)
-- **Superscripts**: pkᴬ, Txᴮ (instead of pk_A, Tx_B)
+- **Subscripts**: sk₀ᴬ, sk₁ᴮ
+- **Superscripts**: pkᴬ, Txᴮ
 - **Tildes**: σ̃ᴬ, sig̃ᴮ for pre-signatures
-- **Greek letters**: π (pi), σ (sigma), directly as Unicode
+- **Greek letters**: π (pi), σ (sigma)
 - **Mathematical symbols**: ∈ (element of), ℤ (integers), · (dot product), ‖ (concatenation)
 
 This approach ensures the notation renders correctly in all contexts (GitHub, Mermaid diagrams, documentation tools) without requiring LaTeX/MathJax support.
