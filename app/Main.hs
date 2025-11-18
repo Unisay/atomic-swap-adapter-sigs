@@ -8,7 +8,7 @@ Users can step through the protocol execution with real-time state visualization
 module Main (main) where
 
 import Lucid (Html, renderBS)
-import Network.HTTP.Types (status200, status400, status404)
+import Network.HTTP.Types (status200, status204, status400, status404)
 import Network.Wai
   ( Application
   , Response
@@ -58,6 +58,7 @@ import AtomicSwap.Simulator.Steps
 import AtomicSwap.Simulator.Types (Asset (..), Quantity (..))
 import Data.IORef.Strict (StrictIORef)
 import Data.IORef.Strict qualified as Strict
+import Data.Text qualified as T
 import System.Random (randomRIO)
 
 --------------------------------------------------------------------------------
@@ -167,6 +168,17 @@ mkApp stateRef req respond =
       Strict.writeIORef stateRef (mkSimulatorState apples bananas)
       currentState <- Strict.readIORef stateRef
       respond $ htmlResponse (mainPage currentState)
+    ("GET", ["static", "fonts", fileName]) ->
+      let contentType = case fileName of
+            _ | ".woff2" `T.isSuffixOf` fileName -> "font/woff2"
+            _ | ".woff" `T.isSuffixOf` fileName -> "font/woff"
+            _ -> "application/octet-stream"
+       in respond $
+            responseFile
+              status200
+              [("Content-Type", contentType)]
+              ("static/fonts/" <> toString fileName)
+              Nothing
     ("GET", ["static", fileName]) ->
       respond $
         responseFile
@@ -174,6 +186,8 @@ mkApp stateRef req respond =
           [("Content-Type", "text/css")]
           ("static/" <> toString fileName)
           Nothing
+    ("GET", ["favicon.ico"]) ->
+      respond $ responseLBS status204 [] ""
     _ ->
       respond $ responseLBS status404 [("Content-Type", "text/plain")] "Not Found"
 

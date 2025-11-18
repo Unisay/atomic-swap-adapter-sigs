@@ -35,7 +35,6 @@ import Lucid
   , doctypehtml_
   , h1_
   , h2_
-  , h3_
   , head_
   , header_
   , href_
@@ -91,7 +90,15 @@ import AtomicSwap.Types
   , Signature (..)
   , Transaction (..)
   )
-import Data.ByteString qualified as BS
+
+--------------------------------------------------------------------------------
+-- Helper Functions ------------------------------------------------------------
+
+-- | Section header with horizontal line and overlaid label
+section_ :: Text -> Html ()
+section_ label =
+  div_ [class_ "section-header"] do
+    span_ [class_ "section-label"] (toHtml label)
 
 --------------------------------------------------------------------------------
 -- Initial Page Template -------------------------------------------------------
@@ -109,17 +116,22 @@ mainPage simState =
             , content_ "width=device-width, initial-scale=1"
             ]
           title_ "Atomic Swap Simulator"
-          -- Iosevka font from jsDelivr CDN
-          link_
-            [ rel_ "stylesheet"
-            , href_ "https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.0.17/index.css"
-            ]
           -- HTMX
           script_ [src_ "https://unpkg.com/htmx.org@1.9.10"] ("" :: Text)
           -- CSS stylesheet
           link_ [rel_ "stylesheet", href_ "/static/style.css"]
 
         body_ do
+          -- JavaScript for select-all on click for readonly inputs
+          script_ $
+            unlines
+              [ "document.addEventListener('click', function(e) {"
+              , "  if (e.target.tagName === 'INPUT' && e.target.hasAttribute('readonly') && e.target.value) {"
+              , "    e.target.select();"
+              , "  }"
+              , "});"
+              ]
+
           div_ [class_ "container"] do
             header_ [class_ "header"] do
               h1_ "Atomic Swap Simulator"
@@ -133,29 +145,24 @@ mainPage simState =
 
                 -- Alice's available actions
                 div_ [id_ "alice-actions", class_ "actions-section"] do
-                  h3_ "Actions"
+                  section_ "Actions"
                   renderAliceActionsFields simState
 
                 div_ [id_ "alice-state", class_ "state-section"] do
-                  h3_ "State"
+                  section_ "State"
                   renderAliceStateFields aliceState
 
               -- Center column: Event timeline
               div_ [class_ "column timeline-column"] do
-                div_
-                  [ style_
-                      "display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e5e7eb;"
-                  ]
-                  do
-                    h2_ [style_ "margin: 0; border: none; padding: 0;"] "Timeline"
-                    button_
-                      [ style_
-                          "background: transparent; border: 1px solid #d1d5db; color: #9ca3af; padding: 4px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;"
-                      , hxPost_ "/reset"
-                      , hxTarget_ "body"
-                      , hxSwap_ "outerHTML"
-                      ]
-                      "Reset"
+                div_ [class_ "timeline-header"] do
+                  h2_ "Timeline"
+                  button_
+                    [ class_ "reset-button"
+                    , hxPost_ "/reset"
+                    , hxTarget_ "body"
+                    , hxSwap_ "outerHTML"
+                    ]
+                    "Reset"
                 div_ [id_ "timeline", class_ "timeline"] do
                   renderNextActionHint simState
                   div_ [id_ "timeline-entries"] do
@@ -167,11 +174,11 @@ mainPage simState =
 
                 -- Bob's available actions
                 div_ [id_ "bob-actions", class_ "actions-section"] do
-                  h3_ "Actions"
+                  section_ "Actions"
                   renderBobActionsFields simState
 
                 div_ [id_ "bob-state", class_ "state-section"] do
-                  h3_ "State"
+                  section_ "State"
                   renderBobStateFields bobState
 
 --------------------------------------------------------------------------------
@@ -184,7 +191,6 @@ renderTimeline (Quantity apples, Quantity bananas) globalState = do
   mapM_ renderTimelineEntry (reverse globalState)
   -- Render Step 0 last so it appears at the bottom
   div_ [class_ "timeline-item"] do
-    span_ [class_ "step-number"] "Step 0"
     span_ [class_ "step-description"] $
       toHtml
         ( "Alice and Bob agree to exchange "
@@ -194,6 +200,7 @@ renderTimeline (Quantity apples, Quantity bananas) globalState = do
             <> " 🍌"
             :: Text
         )
+    span_ [class_ "step-number"] "0"
 
 -- | Render hint for next recommended action (with optional OOB for updates)
 renderNextActionHint :: SimulatorState -> Html ()
@@ -240,8 +247,8 @@ renderTimelineEntry (StepIndex idx, participant, _inputs, updates) =
         Bob -> "timeline-item bob-event" :: Text
       description = describeUpdates participant updates
    in div_ [class_ eventClass] do
-        span_ [class_ "step-number"] $ "Step " <> show (idx + 1)
         span_ [class_ "step-description"] $ toHtml description
+        span_ [class_ "step-number"] $ show (idx + 1)
 
 -- | Generate human-readable description from state updates
 describeUpdates :: Participant -> [StateUpdate] -> Text
@@ -369,74 +376,67 @@ renderAliceStateFields partyState = do
     Just (Ed25519PrivateKey (PrivateKey sk0) sk1) -> do
       div_ [class_ (stateClass (psPrivateKeyFresh partyState))] do
         span_ [class_ "state-label"] "Private Key (sk0)"
-        span_ [class_ "state-value", title_ (formatHex sk0)] $
-          toHtml (formatHex sk0)
+        stateValueInput_ (formatHex sk0)
       div_ [class_ (stateClass (psPrivateKeyFresh partyState))] do
         span_ [class_ "state-label"] "Private Key (sk1)"
-        span_ [class_ "state-value", title_ (formatHex sk1)] $
-          toHtml (formatHex sk1)
+        stateValueInput_ (formatHex sk1)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Private Key (sk0)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Private Key (sk1)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Public Key
   case SM.maybe Nothing Just (psPublicKey partyState) of
     Just (PublicKey pkBytes) -> do
       div_ [class_ (stateClass (psPublicKeyFresh partyState))] do
         span_ [class_ "state-label"] "Public Key"
-        span_ [class_ "state-value", title_ (formatHex pkBytes)] $
-          toHtml (formatHex pkBytes)
+        stateValueInput_ (formatHex pkBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Public Key"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Bob's Public Key (received from Bob)
   case SM.maybe Nothing Just (psOtherPartyPublicKey partyState) of
     Just (PublicKey pkBytes) -> do
       div_ [class_ (stateClass (psOtherPartyPublicKeyFresh partyState))] do
         span_ [class_ "state-label"] "Bob's Public Key"
-        span_ [class_ "state-value", title_ (formatHex pkBytes)] $
-          toHtml (formatHex pkBytes)
+        stateValueInput_ (formatHex pkBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Bob's Public Key"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Adapter Secret
   case SM.maybe Nothing Just (psAdapterSecret partyState) of
     Just (AdapterSecret secretBytes) -> do
       div_ [class_ (stateClass (psAdapterSecretFresh partyState))] do
         span_ [class_ "state-label"] "Adapter Secret (y)"
-        span_ [class_ "state-value", title_ (formatHex secretBytes)] $
-          toHtml (formatHex secretBytes)
+        stateValueInput_ (formatHex secretBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Adapter Secret (y)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Commitment
   case SM.maybe Nothing Just (psAdapterCommitment partyState) of
     Just (AdapterPoint commitBytes) -> do
       div_ [class_ (stateClass (psAdapterCommitmentFresh partyState))] do
         span_ [class_ "state-label"] "Seal (Y)"
-        span_ [class_ "state-value", title_ (formatHex commitBytes)] $
-          toHtml (formatHex commitBytes)
+        stateValueInput_ (formatHex commitBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Seal (Y)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Seal Proof
   case SM.maybe Nothing Just (psNIZKProof partyState) of
     Just (NIZKProof proofBytes) -> do
       div_ [class_ (stateClass (psNIZKProofFresh partyState))] do
         span_ [class_ "state-label"] "Seal Proof"
-        span_ [class_ "state-value", title_ (formatHex proofBytes)] $
-          toHtml (formatHex proofBytes)
+        stateValueInput_ (formatHex proofBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Seal Proof"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Transaction
   case SM.maybe Nothing Just (psTransaction partyState) of
     Just tx -> do
@@ -453,33 +453,27 @@ renderAliceStateFields partyState = do
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Transaction"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Pre-Signature
   case SM.maybe Nothing Just (psPreSignature partyState) of
     Just (AdaptedSignature rSign sigTilde) -> do
       div_ [class_ (stateClass (psPreSignatureFresh partyState))] do
         span_ [class_ "state-label"] "Pre-Signature (σ̃)"
-        span_
-          [class_ "state-value", title_ (formatHex rSign <> " || " <> formatHex sigTilde)]
-          $ toHtml
-          $ formatHex (BS.take 16 rSign) <> "..." <> formatHex (BS.take 8 sigTilde)
+        stateValueInput_ (formatHex rSign <> " || " <> formatHex sigTilde)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Pre-Signature (σ̃)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Alice's Complete Signature
   case SM.maybe Nothing Just (psCompleteSignature partyState) of
     Just (Signature rSign sig) -> do
       div_ [class_ (stateClass (psCompleteSignatureFresh partyState))] do
         span_ [class_ "state-label"] "Complete Sig (σᴬ)"
-        span_
-          [class_ "state-value", title_ (formatHex rSign <> " || " <> formatHex sig)]
-          $ toHtml
-          $ formatHex (BS.take 16 rSign) <> "..." <> formatHex (BS.take 8 sig)
+        stateValueInput_ (formatHex rSign <> " || " <> formatHex sig)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Complete Sig (σᴬ)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Bob's Transaction (received from Bob)
   case SM.maybe Nothing Just (psOtherPartyTransaction partyState) of
     Just tx -> do
@@ -496,34 +490,31 @@ renderAliceStateFields partyState = do
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Bob's Transaction"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Bob's Pre-Signature (received from Bob)
   case SM.maybe Nothing Just (psOtherPartyPreSignature partyState) of
     Just (AdaptedSignature rSign sigTilde) -> do
       div_ [class_ (stateClass (psOtherPartyPreSignatureFresh partyState))] do
         span_ [class_ "state-label"] "Bob's Pre-Sig (σ̃ᴮ)"
-        span_
-          [class_ "state-value", title_ (formatHex rSign <> " || " <> formatHex sigTilde)]
-          $ toHtml
-          $ formatHex (BS.take 16 rSign) <> "..." <> formatHex (BS.take 8 sigTilde)
+        stateValueInput_ (formatHex rSign <> " || " <> formatHex sigTilde)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Bob's Pre-Sig (σ̃ᴮ)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Pre-Signature Verification Status
   if psPreSignatureVerified partyState
-    then div_ [class_ "state-item state-set"] do
+    then div_ [class_ (stateClass (psPreSignatureVerifiedFresh partyState))] do
       span_ [class_ "state-label"] "Pre-Sig Status"
       span_ [class_ "state-value"] "✓ Verified"
     else div_ [class_ "state-item state-unset"] do
       span_ [class_ "state-label"] "Pre-Sig Status"
-      span_ [class_ "state-value"] "[not verified]"
+      span_ [class_ "state-value"] ""
 
 -- | Render Alice's complete state (with OOB wrapper)
 renderAliceStateUpdate :: PartyState -> Html ()
 renderAliceStateUpdate partyState = do
   div_ [hxSwapOob_ "innerHTML:#alice-state"] do
-    h3_ "State"
+    section_ "State"
     renderAliceStateFields partyState
 
 -- | Render Bob's state fields (no OOB wrapper)
@@ -538,77 +529,65 @@ renderBobStateFields partyState = do
     Just (Ed25519PrivateKey (PrivateKey sk0) sk1) -> do
       div_ [class_ (stateClass (psPrivateKeyFresh partyState))] do
         span_ [class_ "state-label"] "Private Key (sk0)"
-        span_ [class_ "state-value", title_ (formatHex sk0)] $
-          toHtml $
-            formatHex sk0
+        stateValueInput_ (formatHex sk0)
       div_ [class_ (stateClass (psPrivateKeyFresh partyState))] do
         span_ [class_ "state-label"] "Private Key (sk1)"
-        span_ [class_ "state-value", title_ (formatHex sk1)] $
-          toHtml $
-            formatHex sk1
+        stateValueInput_ (formatHex sk1)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Private Key (sk0)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Private Key (sk1)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Public Key
   case SM.maybe Nothing Just (psPublicKey partyState) of
     Just (PublicKey pkBytes) -> do
       div_ [class_ (stateClass (psPublicKeyFresh partyState))] do
         span_ [class_ "state-label"] "Public Key"
-        span_ [class_ "state-value", title_ (formatHex pkBytes)] $
-          toHtml $
-            formatHex pkBytes
+        stateValueInput_ (formatHex pkBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Public Key"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Alice's Public Key (received from Alice)
   case SM.maybe Nothing Just (psOtherPartyPublicKey partyState) of
     Just (PublicKey pkBytes) -> do
-      div_ [class_ "state-item state-set"] do
+      div_ [class_ (stateClass (psOtherPartyPublicKeyFresh partyState))] do
         span_ [class_ "state-label"] "Alice's Public Key"
-        span_ [class_ "state-value", title_ (formatHex pkBytes)] $
-          toHtml $
-            formatHex pkBytes
+        stateValueInput_ (formatHex pkBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Alice's Public Key"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Alice's Commitment (received from Alice)
   case SM.maybe Nothing Just (psOtherPartyCommitment partyState) of
     Just (AdapterPoint commitBytes) -> do
-      div_ [class_ "state-item state-set"] do
+      div_ [class_ (stateClass (psOtherPartyCommitmentFresh partyState))] do
         span_ [class_ "state-label"] "Alice's Seal (Y)"
-        span_ [class_ "state-value", title_ (formatHex commitBytes)] $
-          toHtml $
-            formatHex commitBytes
+        stateValueInput_ (formatHex commitBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Alice's Seal (Y)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Alice's Seal Proof (received from Alice)
   case SM.maybe Nothing Just (psOtherPartyNIZKProof partyState) of
     Just (NIZKProof proofBytes) -> do
-      div_ [class_ "state-item state-set"] do
+      div_ [class_ (stateClass (psOtherPartyNIZKProofFresh partyState))] do
         span_ [class_ "state-label"] "Alice's Seal Proof"
-        span_ [class_ "state-value", title_ (formatHex proofBytes)] $
-          toHtml $
-            formatHex proofBytes
+        stateValueInput_ (formatHex proofBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Alice's Seal Proof"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Seal Proof Verification Status
   if psNIZKProofVerified partyState
-    then div_ [class_ "state-item state-set"] do
+    then div_ [class_ (stateClass (psNIZKProofVerifiedFresh partyState))] do
       span_ [class_ "state-label"] "Seal Proof Status"
       span_ [class_ "state-value"] "✓ Verified"
     else div_ [class_ "state-item state-unset"] do
       span_ [class_ "state-label"] "Seal Proof Status"
-      span_ [class_ "state-value"] "[not verified]"
+      span_ [class_ "state-value"] ""
   -- Bob's Own Transaction
   case SM.maybe Nothing Just (psTransaction partyState) of
     Just tx -> do
@@ -625,20 +604,17 @@ renderBobStateFields partyState = do
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Transaction"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Bob's Own Pre-Signature
   case SM.maybe Nothing Just (psPreSignature partyState) of
     Just (AdaptedSignature rSign sigTilde) -> do
       div_ [class_ (stateClass (psPreSignatureFresh partyState))] do
         span_ [class_ "state-label"] "Pre-Signature (σ̃ᴮ)"
-        span_
-          [class_ "state-value", title_ (formatHex rSign <> " || " <> formatHex sigTilde)]
-          $ toHtml
-          $ formatHex (BS.take 16 rSign) <> "..." <> formatHex (BS.take 8 sigTilde)
+        stateValueInput_ (formatHex rSign <> " || " <> formatHex sigTilde)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Pre-Signature (σ̃ᴮ)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Alice's Transaction (received from Alice)
   case SM.maybe Nothing Just (psOtherPartyTransaction partyState) of
     Just tx -> do
@@ -655,50 +631,43 @@ renderBobStateFields partyState = do
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Alice's Transaction"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Alice's Pre-Signature (received from Alice)
   case SM.maybe Nothing Just (psOtherPartyPreSignature partyState) of
     Just (AdaptedSignature rSign sigTilde) -> do
       div_ [class_ (stateClass (psOtherPartyPreSignatureFresh partyState))] do
         span_ [class_ "state-label"] "Alice's Pre-Sig (σ̃ᴬ)"
-        span_
-          [class_ "state-value", title_ (formatHex rSign <> " || " <> formatHex sigTilde)]
-          $ toHtml
-          $ formatHex (BS.take 16 rSign) <> "..." <> formatHex (BS.take 8 sigTilde)
+        stateValueInput_ (formatHex rSign <> " || " <> formatHex sigTilde)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Alice's Pre-Sig (σ̃ᴬ)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Extracted Secret (Bob only)
   case SM.maybe Nothing Just (psExtractedSecret partyState) of
     Just (AdapterSecret secretBytes) -> do
       div_ [class_ (stateClass (psExtractedSecretFresh partyState))] do
         span_ [class_ "state-label"] "Extracted Secret (y)"
-        span_ [class_ "state-value", title_ (formatHex secretBytes)] $
-          toHtml (formatHex secretBytes)
+        stateValueInput_ (formatHex secretBytes)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Extracted Secret (y)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
   -- Bob's Complete Signature
   case SM.maybe Nothing Just (psCompleteSignature partyState) of
     Just (Signature rSign sig) -> do
       div_ [class_ (stateClass (psCompleteSignatureFresh partyState))] do
         span_ [class_ "state-label"] "Complete Sig (σᴮ)"
-        span_
-          [class_ "state-value", title_ (formatHex rSign <> " || " <> formatHex sig)]
-          $ toHtml
-          $ formatHex (BS.take 16 rSign) <> "..." <> formatHex (BS.take 8 sig)
+        stateValueInput_ (formatHex rSign <> " || " <> formatHex sig)
     Nothing -> do
       div_ [class_ "state-item state-unset"] do
         span_ [class_ "state-label"] "Complete Sig (σᴮ)"
-        span_ [class_ "state-value"] "[not set]"
+        span_ [class_ "state-value"] ""
 
 -- | Render Bob's complete state (with OOB wrapper)
 renderBobStateUpdate :: PartyState -> Html ()
 renderBobStateUpdate partyState = do
   div_ [hxSwapOob_ "innerHTML:#bob-state"] do
-    h3_ "State"
+    section_ "State"
     renderBobStateFields partyState
 
 --------------------------------------------------------------------------------
@@ -741,7 +710,7 @@ renderAliceActionsFields simState =
 renderAliceActionsUpdate :: SimulatorState -> Html ()
 renderAliceActionsUpdate simState =
   div_ [hxSwapOob_ "innerHTML:#alice-actions"] do
-    h3_ "Actions"
+    section_ "Actions"
     renderAliceActionsFields simState
 
 -- | Render Bob's action buttons (no OOB wrapper)
@@ -781,11 +750,23 @@ renderBobActionsFields simState =
 renderBobActionsUpdate :: SimulatorState -> Html ()
 renderBobActionsUpdate simState = do
   div_ [hxSwapOob_ "innerHTML:#bob-actions"] do
-    h3_ "Actions"
+    section_ "Actions"
     renderBobActionsFields simState
 
 --------------------------------------------------------------------------------
 -- Helper Functions ------------------------------------------------------------
+
+-- | Render a readonly input field for state values (allows full text selection)
+stateValueInput_ :: Text -> Html ()
+stateValueInput_ value =
+  term
+    "input"
+    [ class_ "state-value"
+    , term "type" "text"
+    , term "readonly" ""
+    , term "value" value
+    ]
+    ""
 
 -- | Format bytes as hex string
 formatHex :: ByteString -> Text

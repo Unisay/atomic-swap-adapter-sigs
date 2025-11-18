@@ -85,7 +85,9 @@ data PartyState = PartyState
   , psOtherPartyPublicKeyFresh :: Bool
   , psAdapterSecretFresh :: Bool
   , psAdapterCommitmentFresh :: Bool
+  , psOtherPartyCommitmentFresh :: Bool
   , psNIZKProofFresh :: Bool
+  , psOtherPartyNIZKProofFresh :: Bool
   , psNIZKProofVerifiedFresh :: Bool
   , psTransactionFresh :: Bool
   , psPreSignatureFresh :: Bool
@@ -134,7 +136,9 @@ emptyPartyState =
       , psOtherPartyPublicKeyFresh = False
       , psAdapterSecretFresh = False
       , psAdapterCommitmentFresh = False
+      , psOtherPartyCommitmentFresh = False
       , psNIZKProofFresh = False
+      , psOtherPartyNIZKProofFresh = False
       , psNIZKProofVerifiedFresh = False
       , psTransactionFresh = False
       , psPreSignatureFresh = False
@@ -227,8 +231,12 @@ markFreshFields party updates state =
         any (\case SetAdapterSecret p _ -> p == party; _ -> False) updates
     , psAdapterCommitmentFresh =
         any (\case SetAdapterCommitment p _ -> p == party; _ -> False) updates
+    , psOtherPartyCommitmentFresh =
+        any (\case SetOtherPartyCommitment p _ -> p == party; _ -> False) updates
     , psNIZKProofFresh =
         any (\case SetNIZKProof p _ -> p == party; _ -> False) updates
+    , psOtherPartyNIZKProofFresh =
+        any (\case SetOtherPartyNIZKProof p _ -> p == party; _ -> False) updates
     , psNIZKProofVerifiedFresh =
         any (\case SetNIZKProofVerified p _ -> p == party; _ -> False) updates
     , psTransactionFresh =
