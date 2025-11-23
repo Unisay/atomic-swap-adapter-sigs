@@ -30,6 +30,7 @@ import AtomicSwap.Simulator.State
   ( SimulatorState
   , detectChangedParties
   , mkSimulatorState
+  , resetToStep
   )
 import AtomicSwap.Simulator.Steps
   ( StepResult (..)
@@ -55,10 +56,11 @@ import AtomicSwap.Simulator.Steps
   , executeBobVerifyAlicePreSignature
   , executeBobVerifyNIZKProof
   )
-import AtomicSwap.Simulator.Types (Asset (..), Quantity (..))
+import AtomicSwap.Simulator.Types (Asset (..), Quantity (..), StepIndex (..))
 import Data.IORef.Strict (StrictIORef)
 import Data.IORef.Strict qualified as Strict
 import Data.Text qualified as T
+import Data.Text.Read qualified as TR
 import System.Random (randomRIO)
 
 --------------------------------------------------------------------------------
@@ -168,6 +170,20 @@ mkApp stateRef req respond =
       Strict.writeIORef stateRef (mkSimulatorState apples bananas)
       currentState <- Strict.readIORef stateRef
       respond $ htmlResponse (mainPage currentState)
+    ("POST", ["reset-to-step", stepIdxText]) -> do
+      -- Parse step index
+      case TR.decimal stepIdxText of
+        Right (idx, "") -> do
+          currentState <- Strict.readIORef stateRef
+          let newState = resetToStep (StepIndex idx) currentState
+          Strict.writeIORef stateRef newState
+          respond $ htmlResponse (mainPage newState)
+        _ ->
+          respond $
+            responseLBS
+              status400
+              [("Content-Type", "text/plain")]
+              "Invalid step index"
     ("GET", ["static", "fonts", fileName]) ->
       let contentType = case fileName of
             _ | ".woff2" `T.isSuffixOf` fileName -> "font/woff2"
@@ -179,6 +195,13 @@ mkApp stateRef req respond =
               [("Content-Type", contentType)]
               ("static/fonts/" <> toString fileName)
               Nothing
+    ("GET", ["static", "icons", fileName]) ->
+      respond $
+        responseFile
+          status200
+          [("Content-Type", "image/svg+xml")]
+          ("static/icons/" <> toString fileName)
+          Nothing
     ("GET", ["static", fileName]) ->
       respond $
         responseFile

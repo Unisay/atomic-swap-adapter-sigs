@@ -28,6 +28,7 @@ module AtomicSwap.Simulator.State
   , appendStep
   , getPartyState
   , getStepCount
+  , resetToStep
 
     -- * State Reconstruction
   , applyUpdate
@@ -213,6 +214,16 @@ getPartyState Bob = ssBobState
 -- | Get current step count
 getStepCount :: SimulatorState -> Int
 getStepCount = length . ssGlobalState
+
+{- | Reset state to a specific step, discarding all steps after it
+
+Truncates GlobalState to include only steps up to (and including) the given
+index, then reconstructs party states from the truncated history.
+-}
+resetToStep :: StepIndex -> SimulatorState -> SimulatorState
+resetToStep (StepIndex targetIdx) state =
+  let truncatedGlobalState = take (targetIdx + 1) (ssGlobalState state)
+   in force $ reconstructState (ssSwapAmounts state) truncatedGlobalState
 
 --------------------------------------------------------------------------------
 -- State Reconstruction --------------------------------------------------------
