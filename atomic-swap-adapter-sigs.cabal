@@ -91,6 +91,11 @@ library
     AtomicSwap.Simulator.Actions
     AtomicSwap.Simulator.Class
     AtomicSwap.Simulator.Render
+    AtomicSwap.Simulator.Render.Actions
+    AtomicSwap.Simulator.Render.Explanations
+    AtomicSwap.Simulator.Render.Helpers
+    AtomicSwap.Simulator.Render.State
+    AtomicSwap.Simulator.Render.Timeline
     AtomicSwap.Simulator.Run
     AtomicSwap.Simulator.State
     AtomicSwap.Simulator.Steps
