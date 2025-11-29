@@ -10,16 +10,16 @@ This documentation describes a production-ready atomic swap protocol between Car
 
 ### New to Atomic Swaps?
 
-1. Read [00-shared-concepts.md](protocol/00-shared-concepts.md) for terminology and fundamentals
-2. Read [01-happy-path.md](protocol/01-happy-path.md) to understand a successful swap
+1. Read [00-shared-concepts.md](00-shared-concepts.md) for terminology and fundamentals
+2. Read [01-happy-path.md](01-happy-path.md) to understand a successful swap
 3. Skim the grief scenarios to understand protection mechanisms
 
 ### Implementing the Protocol?
 
-1. Start with [00-shared-concepts.md](protocol/00-shared-concepts.md) for technical details
-2. Implement happy path first ([01-happy-path.md](protocol/01-happy-path.md))
-3. Add Cancel/Refund ([02-monero-user-griefs.md](protocol/02-monero-user-griefs.md))
-4. Add Punish mechanism ([04-cardano-user-locks-abandons.md](protocol/04-cardano-user-locks-abandons.md))
+1. Start with [00-shared-concepts.md](00-shared-concepts.md) for technical details
+2. Implement happy path first ([01-happy-path.md](01-happy-path.md))
+3. Add Cancel/Refund ([02-monero-user-griefs.md](02-monero-user-griefs.md))
+4. Add Punish mechanism ([04-cardano-user-locks-abandons.md](04-cardano-user-locks-abandons.md))
 
 ### Security Auditing?
 
@@ -71,14 +71,14 @@ Read all documents in order, paying special attention to:
 
 ## Document Index
 
-| Document                                                                        | Description                               | When to Read     |
-| ------------------------------------------------------------------------------- | ----------------------------------------- | ---------------- |
-| [00-shared-concepts.md](protocol/00-shared-concepts.md)                         | Terminology, cryptography, common phases  | First            |
-| [01-happy-path.md](protocol/01-happy-path.md)                                   | Successful swap from start to finish      | Second           |
-| [02-monero-user-griefs.md](protocol/02-monero-user-griefs.md)                   | Monero User doesn't Buy → Cancel + Refund | After happy path |
-| [03-cardano-user-never-locks.md](protocol/03-cardano-user-never-locks.md)       | Lock order prevents this grief            | Reference        |
-| [04-cardano-user-locks-abandons.md](protocol/04-cardano-user-locks-abandons.md) | Cancel without Refund → Punish            | Critical         |
-| [05-technical-failure.md](protocol/05-technical-failure.md)                     | Network/software issues → Safe recovery   | Reference        |
+| Document                                                               | Description                               | When to Read     |
+| ---------------------------------------------------------------------- | ----------------------------------------- | ---------------- |
+| [00-shared-concepts.md](00-shared-concepts.md)                         | Terminology, cryptography, common phases  | First            |
+| [01-happy-path.md](01-happy-path.md)                                   | Successful swap from start to finish      | Second           |
+| [02-monero-user-griefs.md](02-monero-user-griefs.md)                   | Monero User doesn't Buy → Cancel + Refund | After happy path |
+| [03-cardano-user-never-locks.md](03-cardano-user-never-locks.md)       | Lock order prevents this grief            | Reference        |
+| [04-cardano-user-locks-abandons.md](04-cardano-user-locks-abandons.md) | Cancel without Refund → Punish            | Critical         |
+| [05-technical-failure.md](05-technical-failure.md)                     | Network/software issues → Safe recovery   | Reference        |
 
 ---
 
@@ -262,10 +262,10 @@ With Refund revealing `s_cardano`:
 
 ## Quick Reference: What Happens If...
 
-| If...                                 | Then...                         | See                                                                             |
-| ------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------- |
-| Everything works                      | Both swap successfully          | [01-happy-path.md](protocol/01-happy-path.md)                                   |
-| Monero User doesn't Buy               | Both refund via Cancel + Refund | [02-monero-user-griefs.md](protocol/02-monero-user-griefs.md)                   |
-| Cardano User doesn't lock             | Nothing happens                 | [03-cardano-user-never-locks.md](protocol/03-cardano-user-never-locks.md)       |
-| Cardano User Cancels + doesn't Refund | Gets punished, XMR locked       | [04-cardano-user-locks-abandons.md](protocol/04-cardano-user-locks-abandons.md) |
-| Network/software fails                | Same as grief: Cancel + Refund  | [05-technical-failure.md](protocol/05-technical-failure.md)                     |
+| If...                                 | Then...                         | See                                                                    |
+| ------------------------------------- | ------------------------------- | ---------------------------------------------------------------------- |
+| Everything works                      | Both swap successfully          | [01-happy-path.md](01-happy-path.md)                                   |
+| Monero User doesn't Buy               | Both refund via Cancel + Refund | [02-monero-user-griefs.md](02-monero-user-griefs.md)                   |
+| Cardano User doesn't lock             | Nothing happens                 | [03-cardano-user-never-locks.md](03-cardano-user-never-locks.md)       |
+| Cardano User Cancels + doesn't Refund | Gets punished, XMR locked       | [04-cardano-user-locks-abandons.md](04-cardano-user-locks-abandons.md) |
+| Network/software fails                | Same as grief: Cancel + Refund  | [05-technical-failure.md](05-technical-failure.md)                     |
