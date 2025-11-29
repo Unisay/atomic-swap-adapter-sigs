@@ -1,11 +1,7 @@
 # Cardano User Never Locks: Protected by Lock Order
 
----
-
-**Outcome**: No funds at risk, no swap occurs
-**Key Learning**: Lock order (scripted first) prevents this grief vector entirely
-
----
+> **Outcome**: No funds at risk, no swap occurs
+> **Key Learning**: Lock order (scripted first) prevents this grief vector entirely
 
 ## Story Summary
 

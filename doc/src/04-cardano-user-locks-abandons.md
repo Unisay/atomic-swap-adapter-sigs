@@ -1,11 +1,7 @@
 # Cardano User Cancels But Doesn't Refund: Punish Mechanism
 
----
-
-**Outcome**: Cardano User punished, loses entire swap amount to Monero User
-**Key Learning**: Punish mechanism makes griefing economically irrational
-
----
+> **Outcome**: Cardano User punished, loses entire swap amount to Monero User
+> **Key Learning**: Punish mechanism makes griefing economically irrational
 
 ## Story Summary
 

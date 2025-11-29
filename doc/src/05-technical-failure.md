@@ -1,11 +1,7 @@
 # Technical Failure: Safe Recovery via Cancel + Refund
 
----
-
-**Outcome**: Both parties refunded, no swap occurs
-**Key Learning**: Protocol prioritizes safety; failures are indistinguishable from grief
-
----
+> **Outcome**: Both parties refunded, no swap occurs
+> **Key Learning**: Protocol prioritizes safety; failures are indistinguishable from grief
 
 ## Story Summary
 

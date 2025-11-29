@@ -1,11 +1,7 @@
 # Monero User Griefs: Cancel and Refund
 
----
-
-**Outcome**: Both parties refunded, no swap occurs
-**Key Learning**: Cancel + Refund mechanism protects both parties from indefinite lock
-
----
+> **Outcome**: Both parties refunded, no swap occurs
+> **Key Learning**: Cancel + Refund mechanism protects both parties from indefinite lock
 
 ## Story Summary
 
