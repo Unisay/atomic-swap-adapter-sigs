@@ -215,7 +215,7 @@ c32e4e7 Complete cryptography implementation with comprehensive tests
 ### Specification Documents (Public)
 
 - `README.md` - Project overview and quick start
-- `PROTOCOL.md` - 35-step protocol specification
+- `doc/` - Cardano-Monero swap protocol with scenarios (mdBook)
 - `TUTORIAL.md` - Code walkthrough
 - `IMPLEMENTATION-PLAN.md` - Week-by-week roadmap
 

@@ -588,7 +588,7 @@ cardano-crypto-class -- Cardano ecosystem libraries
 
 - ✅ README quick start works for new users
 - ✅ TUTORIAL.md walkthrough matches actual code
-- ✅ PROTOCOL.md accurately describes implementation
+- ✅ doc/ accurately describes implementation
 - ✅ All internal references resolve correctly
 
 ### Cryptographic Correctness
@@ -620,7 +620,7 @@ cardano-crypto-class -- Cardano ecosystem libraries
 ## Next Immediate Actions
 
 1. ✅ User confirms approach (crypto choice, protocol flow)
-2. **Update PROTOCOL.md** with correct two-party flow from research
+2. ✅ **Update doc/** with Cardano-Monero protocol specification
 3. **Update cabal file** with correct dependencies (cryptonite, not secp256k1)
 4. **Begin cryptography implementation** following Zhu et al. specification
 

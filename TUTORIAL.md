@@ -333,7 +333,7 @@ verifyTransaction :: Transaction -> Bool
 
 ## Part 4: Protocol Implementation
 
-**⚠️ Important**: This section is being updated to reflect the correct rEdDSA two-party atomic swap protocol. For the authoritative protocol specification, see **[PROTOCOL.md](PROTOCOL.md)** which contains the complete 35-step flow following Zhu et al. (2024).
+**⚠️ Important**: This section is being updated to reflect the correct rEdDSA two-party atomic swap protocol. For the authoritative protocol specification, see **[doc/](doc/)** which describes the Cardano-Monero swap protocol with detailed scenarios.
 
 **Key Changes from Earlier Versions**:
 
@@ -503,7 +503,7 @@ do
   -- WAIT: I need to reconsider the protocol flow!
 ```
 
-**Important Realization**: The protocol flow in PROTOCOL.md shows Bob completing with `t`, but Bob doesn't have `t` - only Alice does!
+**Important Realization**: In the adapter signature protocol, the party who generates the adapter secret (Monero User in doc/) must reveal it first by claiming on the scripted chain.
 
 **Correct Protocol Flow**:
 
@@ -612,5 +612,5 @@ cabal test
 ---
 
 **Status**: 🚧 Under construction - Cryptography modules being implemented
-**Current**: Parts 1-3 updated for rEdDSA; Part 4-5 refer to [PROTOCOL.md](PROTOCOL.md) for complete protocol details
+**Current**: Parts 1-3 updated for rEdDSA; Part 4-5 refer to [doc/](doc/) for complete protocol details
 **Reference**: See `research/2025-11-14-ed25519-adapter-signatures.md` for complete algorithmic specification
