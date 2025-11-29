@@ -27,6 +27,7 @@ module AtomicSwap.Logging
   , formatHex
   ) where
 
+import AtomicSwap.Types (Participant)
 import Data.ByteString.Base16 qualified as Base16
 import Data.Text.Encoding qualified as TE
 
@@ -70,46 +71,46 @@ logSubPhase subPhase = do
 Log an informational message from a specific party.
 
 Args:
-  - party: The party name (e.g., "Alice", "Bob")
+  - party: The party participant (Alice or Bob)
   - message: The informational message
 -}
-logInfo :: Text -> Text -> IO ()
+logInfo :: Participant -> Text -> IO ()
 logInfo party message = do
-  putTextLn $ "[" <> party <> "] " <> message
+  putTextLn $ "[" <> show party <> "] " <> message
 
 {- |
 Log an action being performed by a party.
 
 Args:
-  - party: The party name
+  - party: The party participant
   - action: Description of the action
 -}
-logAction :: Text -> Text -> IO ()
+logAction :: Participant -> Text -> IO ()
 logAction party action = do
-  putTextLn $ "[" <> party <> "] ➜ " <> action
+  putTextLn $ "[" <> show party <> "] ➜ " <> action
 
 {- |
 Log a secret value in hexadecimal format (WARNING: use only for debugging).
 
 Args:
-  - party: The party name
+  - party: The party participant
   - label: Description of the secret
   - secret: The secret bytes
 -}
-logSecret :: Text -> Text -> ByteString -> IO ()
+logSecret :: Participant -> Text -> ByteString -> IO ()
 logSecret party label secret = do
-  putTextLn $ "[" <> party <> "] 🔒 " <> label <> ": " <> formatHex secret
+  putTextLn $ "[" <> show party <> "] 🔒 " <> label <> ": " <> formatHex secret
 
 {- |
 Log an error message from a party.
 
 Args:
-  - party: The party name
+  - party: The party participant
   - errorMsg: The error message
 -}
-logError :: Text -> Text -> IO ()
+logError :: Participant -> Text -> IO ()
 logError party errorMsg = do
-  putTextLn $ "[" <> party <> "] ❌ ERROR: " <> errorMsg
+  putTextLn $ "[" <> show party <> "] ❌ ERROR: " <> errorMsg
 
 --------------------------------------------------------------------------------
 -- Transaction Logging ---------------------------------------------------------
@@ -118,27 +119,27 @@ logError party errorMsg = do
 Log transaction details in human-readable format.
 
 Args:
-  - party: The party logging the transaction
+  - party: The party participant logging the transaction
   - label: Description of the transaction
   - txId: Transaction ID
 -}
-logTransaction :: Text -> Text -> ByteString -> IO ()
+logTransaction :: Participant -> Text -> ByteString -> IO ()
 logTransaction party label txId = do
-  putTextLn $ "[" <> party <> "] 📝 " <> label
+  putTextLn $ "[" <> show party <> "] 📝 " <> label
   putTextLn $ "    Transaction ID: " <> formatHex txId
 
 {- |
 Log signature details.
 
 Args:
-  - party: The party logging the signature
+  - party: The party participant logging the signature
   - label: Description of the signature
   - sigR: The nonce component (R)
   - sigS: The scalar component (s)
 -}
-logSignature :: Text -> Text -> ByteString -> ByteString -> IO ()
+logSignature :: Participant -> Text -> ByteString -> ByteString -> IO ()
 logSignature party label sigR sigS = do
-  putTextLn $ "[" <> party <> "] ✍ " <> label
+  putTextLn $ "[" <> show party <> "] ✍ " <> label
   putTextLn $ "    R: " <> formatHex sigR
   putTextLn $ "    s: " <> formatHex sigS
 
@@ -146,13 +147,13 @@ logSignature party label sigR sigS = do
 Log public key information.
 
 Args:
-  - party: The party logging the public key
+  - party: The party participant logging the public key
   - label: Description of the key
   - pubKey: The public key bytes
 -}
-logPublicKey :: Text -> Text -> ByteString -> IO ()
+logPublicKey :: Participant -> Text -> ByteString -> IO ()
 logPublicKey party label pubKey = do
-  putTextLn $ "[" <> party <> "] 🔑 " <> label <> ": " <> formatHex pubKey
+  putTextLn $ "[" <> show party <> "] 🔑 " <> label <> ": " <> formatHex pubKey
 
 --------------------------------------------------------------------------------
 -- Utility Functions -----------------------------------------------------------

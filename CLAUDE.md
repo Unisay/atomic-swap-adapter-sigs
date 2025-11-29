@@ -49,7 +49,7 @@ Educational Haskell tutorial demonstrating atomic swaps using **rEdDSA adapter s
 
 - Current status? → See [STATUS.md](STATUS.md)
 - Design decisions? → See [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)
-- Protocol details? → See [PROTOCOL.md](PROTOCOL.md)
+- Protocol details? → See [doc/](doc/) (mdBook)
 - Code walkthrough? → See [TUTORIAL.md](TUTORIAL.md)
 - User overview? → See [README.md](README.md)
 
@@ -76,9 +76,46 @@ pre-commit run --all-files
 
 # Lint only
 hlint src/ test/
+
+# Build protocol documentation (mdBook)
+cd doc && mdbook build
+
+# Serve protocol documentation locally
+cd doc && mdbook serve --open
 ```
 
 **Note**: Test output format (`--test-show-details=streaming`) is configured in `cabal.project`.
+
+**mdBook output**: Built documentation is in `doc/book/` (git-ignored).
+
+## Development Workflow (Simulator)
+
+### Auto-rebuild with watchman-make (Recommended for Claude Code)
+
+Run simulator with automatic rebuild/restart on file changes:
+
+```bash
+# Start watchman-make in background (Claude Code can use this)
+watchman-make \
+  -p 'src/**/*.hs' 'app/**/*.hs' '*.cabal' \
+  --run 'pkill -9 -x atomic-swap-simulator; cabal build --ghc-options=-Werror && nohup cabal run atomic-swap-simulator > /tmp/simulator.log 2>&1 &' &
+
+# Check server logs
+tail -f /tmp/simulator.log
+
+# Stop watchman and server
+pkill -9 -f watchman; pkill -9 -x atomic-swap-simulator
+```
+
+**Behavior**:
+
+- Watches `src/**/*.hs`, `app/**/*.hs`, `*.cabal`
+- On file change: kills old server, rebuilds, restarts server
+- Server runs on http://localhost:8888
+- Logs to `/tmp/simulator.log`
+- If build fails, server is NOT restarted (old version keeps running)
+
+**For Claude Code**: Use the watchman-make command as a background process. It will automatically restart the server after every code change.
 
 ## Code Architecture
 
@@ -114,6 +151,36 @@ test/AtomicSwap/
 ```
 
 ### Key Design Patterns
+
+**Interactive Simulator Architecture (State-Diffing + Event Sourcing)**:
+
+- **GlobalState**: Append-only log of StateUpdates (single source of truth)
+- **PartyState**: Read-only projections computed by folding GlobalState
+- **appendStep**: Only mutation point (appends to log, reconstructs all projections)
+- **Step Handlers**: Pure event appenders (`m ()` or `m Bool`), don't know about rendering
+- **HTTP Layer**: Diffs state before/after, detects changed parties, renders only affected UI panels
+- **Benefits**: Automatic cross-participant updates, simpler handlers, bug elimination
+
+Pattern for step execution:
+
+```haskell
+-- Handler (pure event appender)
+executeStep :: MonadSimulator m => m Bool
+executeStep = do
+  state <- getPartyState Alice  -- Read projection
+  applyUpdates Alice inputs [update1, update2]  -- Append to log
+  pure True  -- No rendering concern
+
+-- HTTP layer (state-diffing)
+handleStep = do
+  oldState <- readIORef stateRef
+  success <- runSimulatorT stateRef executeStep
+  newState <- readIORef stateRef
+  changedParties <- detectChangedParties oldState newState  -- Diff
+  respond $ renderStateUpdates changedParties newState  -- Render only changed
+```
+
+See `src/AtomicSwap/Simulator/State.hs:10-19` for detailed architecture documentation.
 
 **Cryptography (Zhu et al. 2024 rEdDSA)**:
 
@@ -182,8 +249,36 @@ test/AtomicSwap/
 ### Modern Haskell Extensions
 
 - **BlockArguments**: Required (`it "test" do` not `it "test" $ do`)
+  - **Style preference**: Never use `$` before lambda as last argument
+  - Use `foo \x -> ...` instead of `foo $ \x -> ...`
+  - Use `bar \case` instead of `bar $ \case`
 - **DerivingVia**: For consistent Show instances (see HexBytes pattern)
 - **ImportQualifiedPost**: Required (`import Data.Map qualified as Map`)
+
+### Type Safety Principles
+
+**Type-Indexed Newtypes Over Primitives:**
+
+- Prefer: `Quantity 'Apple` over `Natural` over `Int`
+- Pattern: `newtype Quantity (asset :: Asset) = Quantity Natural`
+- Prevents mixing incompatible values (apples vs bananas)
+- Provides type-level guarantees and better compiler errors
+
+**When designing types:**
+
+1. Start with most specific type possible
+2. Use GADTs/DataKinds for type-level constraints
+3. Avoid primitive types (Int, Text, ByteString) for domain values
+4. Derive common instances (Eq, Ord, Show, NFData, NoThunks)
+
+### CSS and Styling
+
+**CSS-First Principle**: Always define styles in `static/style.css`, never use inline styles in Lucid HTML.
+
+- Add CSS classes to stylesheet
+- Reference classes in HTML: `div_ [class_ "my-class"]`
+- Only use inline styles if absolutely necessary (e.g., dynamic computed values)
+- Rationale: Maintainability, consistency, separation of concerns
 
 ### Zero-Warning Standard
 
@@ -237,7 +332,7 @@ cabal build --ghc-options=-Werror
 | ------------------------ | ---------------------------------------------------------- | ------------------------ |
 | `README.md`              | Project overview with references to other docs             | End users, learners      |
 | `STATUS.md`              | **Implementation status**, module completion, test results | Developers, contributors |
-| `PROTOCOL.md`            | 35-step protocol specification with security analysis      | Technical readers        |
+| `doc/` (mdBook)          | Cardano-Monero swap protocol with scenario documentation   | Technical readers        |
 | `TUTORIAL.md`            | Step-by-step code walkthrough                              | Learners                 |
 | `IMPLEMENTATION-PLAN.md` | Week-by-week roadmap, **design decisions**                 | Developers               |
 | `CLAUDE.md`              | Developer guide, **code patterns**, build commands         | Claude Code              |

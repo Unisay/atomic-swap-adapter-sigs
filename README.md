@@ -47,7 +47,7 @@ All documentation is organized by purpose:
 | Document                                             | Purpose                                                        |
 | ---------------------------------------------------- | -------------------------------------------------------------- |
 | **[STATUS.md](STATUS.md)**                           | Current implementation status, module completion, test results |
-| **[PROTOCOL.md](PROTOCOL.md)**                       | 35-step protocol specification with security analysis          |
+| **[Protocol Documentation](doc/)**                   | Cardano-Monero swap protocol specification with scenarios      |
 | **[TUTORIAL.md](TUTORIAL.md)**                       | Step-by-step code walkthrough with explanations                |
 | **[IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)** | Week-by-week implementation roadmap and design decisions       |
 | **[CLAUDE.md](CLAUDE.md)**                           | Developer guide for working with this codebase                 |
@@ -63,7 +63,7 @@ Detailed research documents are in the `research/` directory:
 ## Learning Path
 
 1. **Overview**: Read this README
-2. **Protocol**: Read [PROTOCOL.md](PROTOCOL.md) to understand the cryptographic protocol
+2. **Protocol**: Read [Protocol Documentation](doc/) to understand the cryptographic protocol
 3. **Status**: Check [STATUS.md](STATUS.md) to see what's implemented
 4. **Code**: Follow [TUTORIAL.md](TUTORIAL.md) for code walkthrough
 5. **Deep dive**: Read research documents for cryptographic details

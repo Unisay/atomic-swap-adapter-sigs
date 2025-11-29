@@ -18,19 +18,13 @@ import Control.Concurrent.Async (async, waitBoth)
 import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec (Spec, describe, it, shouldBe)
 
-import AtomicSwap.Blockchain.Ledger
-  ( getBalance
-  , initBlockchain
-  )
+import AtomicSwap.Blockchain.Ledger (getBalance, initBlockchain)
 import AtomicSwap.Blockchain.Types (GenesisUTXO (..))
 import AtomicSwap.Crypto.Keys (generateKeyPair)
 import AtomicSwap.Protocol.Alice (aliceProtocol)
 import AtomicSwap.Protocol.Bob (bobProtocol)
 import AtomicSwap.Protocol.Messaging (newMessageQueue)
-import AtomicSwap.Types
-  ( Party (..)
-  , SwapResult (..)
-  )
+import AtomicSwap.Types (Participant (..), Party (..), SwapResult (..))
 
 --------------------------------------------------------------------------------
 -- Test Suite ------------------------------------------------------------------
@@ -43,19 +37,10 @@ spec = describe "Atomic Swap - Happy Path" do
       (aliceSk, alicePk) <- generateKeyPair
       (bobSk, bobPk) <- generateKeyPair
 
-      -- Create parties
-      let alice =
-            Party
-              { partyName = "Alice"
-              , partyPrivateKey = aliceSk
-              , partyPublicKey = alicePk
-              }
-          bob =
-            Party
-              { partyName = "Bob"
-              , partyPrivateKey = bobSk
-              , partyPublicKey = bobPk
-              }
+      let
+        -- Create parties
+        alice = Party Alice aliceSk alicePk
+        bob = Party Bob bobSk bobPk
 
       -- Initialize blockchains with genesis UTXOs
       -- Alice has 10 tokens on ChainA, Bob has 5 tokens on ChainB
