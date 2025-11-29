@@ -49,7 +49,7 @@ Educational Haskell tutorial demonstrating atomic swaps using **rEdDSA adapter s
 
 - Current status? → See [STATUS.md](STATUS.md)
 - Design decisions? → See [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)
-- Protocol details? → See [PROTOCOL.md](PROTOCOL.md)
+- Protocol details? → See [doc/](doc/) (mdBook)
 - Code walkthrough? → See [TUTORIAL.md](TUTORIAL.md)
 - User overview? → See [README.md](README.md)
 
@@ -76,9 +76,17 @@ pre-commit run --all-files
 
 # Lint only
 hlint src/ test/
+
+# Build protocol documentation (mdBook)
+cd doc && mdbook build
+
+# Serve protocol documentation locally
+cd doc && mdbook serve --open
 ```
 
 **Note**: Test output format (`--test-show-details=streaming`) is configured in `cabal.project`.
+
+**mdBook output**: Built documentation is in `doc/book/` (git-ignored).
 
 ## Development Workflow (Simulator)
 
@@ -324,7 +332,7 @@ cabal build --ghc-options=-Werror
 | ------------------------ | ---------------------------------------------------------- | ------------------------ |
 | `README.md`              | Project overview with references to other docs             | End users, learners      |
 | `STATUS.md`              | **Implementation status**, module completion, test results | Developers, contributors |
-| `PROTOCOL.md`            | 35-step protocol specification with security analysis      | Technical readers        |
+| `doc/` (mdBook)          | Cardano-Monero swap protocol with scenario documentation   | Technical readers        |
 | `TUTORIAL.md`            | Step-by-step code walkthrough                              | Learners                 |
 | `IMPLEMENTATION-PLAN.md` | Week-by-week roadmap, **design decisions**                 | Developers               |
 | `CLAUDE.md`              | Developer guide, **code patterns**, build commands         | Claude Code              |

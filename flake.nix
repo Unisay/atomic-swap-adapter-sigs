@@ -105,6 +105,9 @@
               nodePackages.prettier # Markdown
               nixfmt-rfc-style
 
+              # Documentation
+              mdbook
+
               # Development workflow
               watchman # File watching for auto-rebuild
 
