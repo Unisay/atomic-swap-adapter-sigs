@@ -12,8 +12,8 @@ create-missing = true
 [output.html]
 default-theme = "rust"
 preferred-dark-theme = "navy"
-git-repository-url = "https://github.com/your-repo/atomic-swap-adapter-sigs"
-edit-url-template = "https://github.com/your-repo/atomic-swap-adapter-sigs/edit/main/doc/{path}"
+git-repository-url = "https://github.com/Unisay/atomic-swap-adapter-sigs"
+edit-url-template = "https://github.com/Unisay/atomic-swap-adapter-sigs/edit/main/doc/{path}"
 
 [output.html.fold]
 enable = true
