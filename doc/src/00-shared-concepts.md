@@ -1,7 +1,7 @@
 # Shared Concepts: Cardano-Monero Atomic Swap
 
-> **Purpose**: Single source of truth for terminology, notation, and common phases
-> **Prerequisite**: Basic understanding of cryptographic signatures
+> **Purpose**: Single source of truth for terminology, notation, and common phases<br>
+> **Prerequisite**: Basic understanding of cryptographic signatures<br>
 > **Reference**: COMIT XMR-BTC RFC, Farcaster RFC-08, adapted for Cardano-Monero
 
 ## Terminology

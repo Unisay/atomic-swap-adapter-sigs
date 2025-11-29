@@ -1,6 +1,6 @@
 # Happy Path: Successful Atomic Swap
 
-> **Outcome**: Both parties successfully exchange assets
+> **Outcome**: Both parties successfully exchange assets<br>
 > **Key Learning**: Adapter signatures create atomic linkage across chains
 
 ## Story Summary
