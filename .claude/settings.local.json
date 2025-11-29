@@ -11,5 +11,10 @@
         "mcp__ide__executeCode": "ask"
       }
     }
+  },
+  "permissions": {
+    "allow": [
+      "mcp__sequential-thinking__sequentialthinking"
+    ]
   }
 }
