@@ -2,7 +2,6 @@
 title = "Cardano-Monero Atomic Swap Protocol"
 authors = ["Atomic Swap Tutorial"]
 language = "en"
-multilingual = false
 src = "src"
 
 [build]
