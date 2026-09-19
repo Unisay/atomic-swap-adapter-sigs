@@ -2,7 +2,7 @@
 
 > **Note**: This file is the single source of truth for implementation status, module completion, and test results. Other documents reference this file.
 
-**Last Updated**: 2025-11-15
+**Last Updated**: 2026-09-19
 **Version**: 0.1.0-dev
 **Phase**: Protocol implementation complete, integration testing next
 
@@ -18,7 +18,7 @@
 
 **Project Infrastructure**: 100% Complete
 
-- Nix flake with haskell.nix (GHC 9.6.6)
+- Nix flake with haskell.nix (GHC 9.12.4)
 - Cabal configuration with all dependencies
 - Code quality tools (fourmolu, treefmt, hlint)
 - HSpec test framework
@@ -72,6 +72,15 @@
 - Refund scenario tests (timeout handling)
 
 ## Build Status
+
+**Toolchain** (refreshed 2026-09-19):
+
+```
+GHC              9.12.4 (haskell.nix compiler-nix-name = ghc9124)
+Hackage          index-state 2026-09-18T00:00:00Z
+Crypto           crypton 1.1.5 + ram 0.22.1 (replaced cryptonite + memory)
+mdBook           0.5.x (0.5.3 in the dev shell, 0.5.4 pinned in CI)
+```
 
 **Compilation**:
 

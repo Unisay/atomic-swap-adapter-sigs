@@ -1,7 +1,7 @@
 packages: .
 
 -- Use recent package index
-index-state: 2025-01-14T00:00:00Z
+index-state: 2026-09-18T00:00:00Z
 
 -- Test configuration
 test-show-details: streaming

@@ -43,7 +43,7 @@
         # haskell.nix project for building the Cabal project
         project = pkgs.haskell-nix.cabalProject' {
           src = ./.;
-          compiler-nix-name = "ghc966";
+          compiler-nix-name = "ghc9124";
 
           modules = [
             {
@@ -68,8 +68,8 @@
               settings.formatters = [
                 pkgs.fourmolu
                 pkgs.haskellPackages.cabal-fmt
-                pkgs.nixfmt-rfc-style
-                pkgs.nodePackages.prettier
+                pkgs.nixfmt
+                pkgs.prettier
               ];
             };
             # hlint is the only hook that doesn't modify files
@@ -102,8 +102,8 @@
 
               # Formatting tools
               treefmt
-              nodePackages.prettier # Markdown
-              nixfmt-rfc-style
+              prettier # Markdown
+              nixfmt
 
               # Documentation
               mdbook

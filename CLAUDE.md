@@ -59,6 +59,9 @@ Educational Haskell tutorial demonstrating atomic swaps using **rEdDSA adapter s
 # Enter development environment
 nix develop
 
+# Refresh the local Hackage index (needed after cabal.project index-state moves)
+cabal update
+
 # Build (enforces zero warnings)
 cabal build --ghc-options=-Werror
 
@@ -368,9 +371,10 @@ cabal build --ghc-options=-Werror
 
 **Key libraries**:
 
-- `cryptonite` - Ed25519 curve operations (`Crypto.ECC.Edwards25519`)
+- `crypton` - Ed25519 curve operations (`Crypto.ECC.Edwards25519`); maintained fork of the deprecated `cryptonite`
 - `Crypto.Hash` - SHA-512 for H1/H2 hash functions
 - `Crypto.Number.Serialize.LE` - Little-endian serialization
+- `ram` - `Data.ByteArray` (`convert`); crypton dropped `memory` for `ram`
 
 **Critical constants**:
 
@@ -441,6 +445,9 @@ This project demonstrates a research-heavy initialization pattern:
 ## Common Pitfalls
 
 - **Endianness**: Use little-endian for Ed25519 scalars/points
+- **`ram`, not `memory`**: crypton's `Digest` gets its `ByteArrayAccess`
+  instance from `ram`. Depending on `memory` instead gives the error
+  `No instance for memory-x.y:Data.ByteArray.Types.ByteArrayAccess (Digest SHA512)`.
 - **Nonce randomness**: Must include fresh random `k` in rEdDSA
 - **Adapter arithmetic**: `sig = sig_tilde + y` (Alice), not subtraction
 - **Name shadowing**: Avoid variable names matching record accessors
@@ -468,7 +475,7 @@ This project demonstrates a research-heavy initialization pattern:
 
 **treefmt Configuration** (`treefmt.toml` is the single source of truth):
 
-- Orchestrates: fourmolu, cabal-fmt, nixfmt-rfc-style, prettier
+- Orchestrates: fourmolu, cabal-fmt, nixfmt, prettier
 - All fourmolu options passed as CLI args (no fourmolu.yaml)
 - Key settings: `column-limit: 80`, `comma-style: leading`, `single-constraint-parens: never`
 - Pre-commit hooks run treefmt (not individual formatters)

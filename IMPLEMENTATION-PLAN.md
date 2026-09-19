@@ -98,7 +98,7 @@ verifyREdDSA :: PublicKey -> ByteString -> Signature -> Bool
 
 **Implementation**:
 
-- Use `cryptonite` for Ed25519 curve operations
+- Use `crypton` for Ed25519 curve operations
 - Implement H1 (key derivation) and H2 (signature hash) using SHA-512
 - Add randomness `k` to nonce generation: `r = H2(sk1 || m || k)`
 
@@ -388,8 +388,8 @@ spec = describe "Atomic Swap using rEdDSA Adapter Signatures" $ do
 **Cryptography**:
 
 ```cabal
-cryptonite          -- Ed25519, SHA-512, curve operations
-memory              -- ByteString utilities
+crypton             -- Ed25519, SHA-512, curve operations
+ram                 -- ByteString utilities (Data.ByteArray)
 ```
 
 **Concurrency**:
@@ -416,7 +416,7 @@ hspec-discover      -- Auto-discovery
 temporary           -- Temporary directories
 ```
 
-**Optional** (if cryptonite insufficient):
+**Optional** (if crypton insufficient):
 
 ```cabal
 ed25519             -- Lightweight Ed25519
@@ -621,7 +621,7 @@ cardano-crypto-class -- Cardano ecosystem libraries
 
 1. ✅ User confirms approach (crypto choice, protocol flow)
 2. ✅ **Update doc/** with Cardano-Monero protocol specification
-3. **Update cabal file** with correct dependencies (cryptonite, not secp256k1)
+3. **Update cabal file** with correct dependencies (crypton, not secp256k1)
 4. **Begin cryptography implementation** following Zhu et al. specification
 
 ---
@@ -751,7 +751,7 @@ The following gaps and improvements from the code review must be addressed:
 10. **Add Constant-Time Operations Warning**
     - **Files**: Crypto modules
     - **Issue**: No constant-time guarantees (timing attacks possible)
-    - **Fix**: Document limitation, note that cryptonite may not be constant-time
+    - **Fix**: Document limitation, note that crypton may not be constant-time
     - **Timeline**: Week 5 Day 2 (documentation)
 
 ### Low Priority Issues (Nice to Have)

@@ -21,7 +21,7 @@ common common-deps
     , base16-bytestring
     , bytestring
     , containers
-    , cryptonite
+    , crypton
     , deepseq
     , directory
     , foldl
@@ -29,9 +29,9 @@ common common-deps
     , io-classes
     , io-sim
     , lucid2             ^>=0.0.20221012
-    , memory
     , mtl
     , nothunks           ^>=0.3
+    , ram
     , random
     , relude             ^>=1.2.2
     , stm
@@ -39,8 +39,8 @@ common common-deps
     , strict-containers  ^>=0.2
     , text
     , wai                ^>=3.2
-    , wai-app-static     ^>=3.1
-    , warp               ^>=3.3
+    , wai-app-static     ^>=3.2
+    , warp               ^>=3.4
 
 common common-language
   import:             common-deps
